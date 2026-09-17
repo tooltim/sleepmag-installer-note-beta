@@ -1,0 +1,28 @@
+{
+  "name": "sleep-network-bootstrap",
+  "version": "1.0.0",
+  "description": "Cross-platform (Windows / macOS) Node.js installer for the Sleep Network workspace",
+  "type": "module",
+  "bin": {
+    "sleep-network-bootstrap": "./bin/install.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node bin/install.js",
+    "test": "node --test test/*.test.js",
+    "check": "SLEEPNET_MODE=check node bin/install.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tooltim/sleep-network-bootstrap.git"
+  },
+  "license": "MIT",
+  "files": [
+    "bin",
+    "src",
+    "scripts",
+    "README.md"
+  ]
+}
