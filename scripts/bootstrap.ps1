@@ -69,18 +69,18 @@ if (-not $node) {
 if (-not $node) { throw "Node.js is required. Install from https://nodejs.org and re-run." }
 Ok ("node " + (& $node --version))
 
-$BootstrapDir = Join-Path $env:TEMP 'sleep-network-bootstrap'
-$Repo = 'https://github.com/tooltim/sleep-network-bootstrap.git'
+$BootstrapDir = Join-Path $env:TEMP 'sleepmag-installer-note-beta'
+$Repo = 'https://github.com/tooltim/sleepmag-installer-note-beta.git'
 if (-not (Have 'git')) {
     Say "Git not found — the Node installer will install it; cloning bootstrap via zip…"
-    $zip = Join-Path $env:TEMP 'sleep-network-bootstrap.zip'
-    Invoke-WebRequest 'https://github.com/tooltim/sleep-network-bootstrap/archive/refs/heads/main.zip' -OutFile $zip
+    $zip = Join-Path $env:TEMP 'sleepmag-installer-note-beta.zip'
+    Invoke-WebRequest 'https://github.com/tooltim/sleepmag-installer-note-beta/archive/refs/heads/main.zip' -OutFile $zip
     if (Test-Path $BootstrapDir) { Remove-Item -Recurse -Force $BootstrapDir }
     Expand-Archive -Path $zip -DestinationPath $env:TEMP -Force
-    $extracted = Join-Path $env:TEMP 'sleep-network-bootstrap-main'
+    $extracted = Join-Path $env:TEMP 'sleepmag-installer-note-beta-main'
     if (Test-Path $extracted) {
-        Rename-Item $extracted 'sleep-network-bootstrap' -ErrorAction SilentlyContinue
-        $BootstrapDir = Join-Path $env:TEMP 'sleep-network-bootstrap'
+        Rename-Item $extracted 'sleepmag-installer-note-beta' -ErrorAction SilentlyContinue
+        $BootstrapDir = Join-Path $env:TEMP 'sleepmag-installer-note-beta'
         if (-not (Test-Path $BootstrapDir)) { $BootstrapDir = $extracted }
     }
 } else {

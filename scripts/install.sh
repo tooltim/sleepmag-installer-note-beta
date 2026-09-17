@@ -38,8 +38,8 @@ ensure_node() {
 
 ensure_node
 
-BOOTSTRAP_DIR="${TMPDIR:-/tmp}/sleep-network-bootstrap"
-REPO="https://github.com/tooltim/sleep-network-bootstrap.git"
+BOOTSTRAP_DIR="${TMPDIR:-/tmp}/sleepmag-installer-note-beta"
+REPO="https://github.com/tooltim/sleepmag-installer-note-beta.git"
 
 if have git; then
   if [[ ! -d "$BOOTSTRAP_DIR/.git" ]]; then
@@ -50,11 +50,11 @@ if have git; then
   fi
 else
   say "Git not found — downloading bootstrap zip…"
-  ZIP="${TMPDIR:-/tmp}/sleep-network-bootstrap.zip"
-  curl -fsSL -o "$ZIP" "https://github.com/tooltim/sleep-network-bootstrap/archive/refs/heads/main.zip"
-  rm -rf "$BOOTSTRAP_DIR" "${TMPDIR:-/tmp}/sleep-network-bootstrap-main"
+  ZIP="${TMPDIR:-/tmp}/sleepmag-installer-note-beta.zip"
+  curl -fsSL -o "$ZIP" "https://github.com/tooltim/sleepmag-installer-note-beta/archive/refs/heads/main.zip"
+  rm -rf "$BOOTSTRAP_DIR" "${TMPDIR:-/tmp}/sleepmag-installer-note-beta-main"
   unzip -q "$ZIP" -d "${TMPDIR:-/tmp}"
-  mv "${TMPDIR:-/tmp}/sleep-network-bootstrap-main" "$BOOTSTRAP_DIR"
+  mv "${TMPDIR:-/tmp}/sleepmag-installer-note-beta-main" "$BOOTSTRAP_DIR"
 fi
 
 ENTRY="$BOOTSTRAP_DIR/bin/install.js"

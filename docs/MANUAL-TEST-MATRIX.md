@@ -1,4 +1,4 @@
-# Manual test matrix — sleep-network-bootstrap
+# Manual test matrix — sleepmag-installer-note-beta
 
 Status key: **Verified** (ran on real OS) · **Simulated** (unit/dry-run/CI on Linux agent) · **Not run**
 
@@ -31,10 +31,10 @@ Status key: **Verified** (ran on real OS) · **Simulated** (unit/dry-run/CI on L
 
 ```powershell
 $env:SLEEPNET_MODE='check'
-irm https://raw.githubusercontent.com/tooltim/sleep-network-bootstrap/main/scripts/bootstrap.ps1 | iex
+irm https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/main/scripts/bootstrap.ps1 | iex
 
 # Full install (interactive):
-irm https://raw.githubusercontent.com/tooltim/sleep-network-bootstrap/main/scripts/bootstrap.ps1 | iex
+irm https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/main/scripts/bootstrap.ps1 | iex
 ```
 
 Confirm Desktop **Sleep Network.lnk** and `%USERPROFILE%\Documents\sleep-network` (or OneDrive Documents).
@@ -42,8 +42,8 @@ Confirm Desktop **Sleep Network.lnk** and `%USERPROFILE%\Documents\sleep-network
 ### macOS
 
 ```bash
-SLEEPNET_MODE=check curl -fsSL https://raw.githubusercontent.com/tooltim/sleep-network-bootstrap/main/scripts/install.sh | bash
-curl -fsSL https://raw.githubusercontent.com/tooltim/sleep-network-bootstrap/main/scripts/install.sh | bash
+SLEEPNET_MODE=check curl -fsSL https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/main/scripts/install.sh | bash
 ```
 
 Confirm Desktop **Sleep Network.command** and `~/Documents/sleep-network`.

@@ -11,15 +11,15 @@ Public on purpose: teammates can download it before they have access to anything
 ### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/tooltim/sleep-network-bootstrap/main/scripts/bootstrap.ps1 | iex
+irm https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/main/scripts/bootstrap.ps1 | iex
 ```
 
-Or download and double-click [`Install-SleepNetwork.cmd`](https://github.com/tooltim/sleep-network-bootstrap/raw/main/Install-SleepNetwork.cmd).
+Or download and double-click [`Install-SleepNetwork.cmd`](https://github.com/tooltim/sleepmag-installer-note-beta/raw/main/Install-SleepNetwork.cmd).
 
 ### macOS (Terminal)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tooltim/sleep-network-bootstrap/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/main/scripts/install.sh | bash
 ```
 
 ### Linux (best-effort)
@@ -27,20 +27,20 @@ curl -fsSL https://raw.githubusercontent.com/tooltim/sleep-network-bootstrap/mai
 Same as macOS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tooltim/sleep-network-bootstrap/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/main/scripts/install.sh | bash
 ```
 
 ### Already have Node 18+?
 
 ```bash
-npx --yes github:tooltim/sleep-network-bootstrap
+npx --yes github:tooltim/sleepmag-installer-note-beta
 ```
 
 Or clone and run:
 
 ```bash
-git clone https://github.com/tooltim/sleep-network-bootstrap.git
-node sleep-network-bootstrap/bin/install.js
+git clone https://github.com/tooltim/sleepmag-installer-note-beta.git
+node sleepmag-installer-note-beta/bin/install.js
 ```
 
 ## What “done” looks like
@@ -67,11 +67,11 @@ Workspace location: your OS **Documents** folder `/ sleep-network` (follows OneD
 Example check:
 
 ```powershell
-$env:SLEEPNET_MODE='check'; irm https://raw.githubusercontent.com/tooltim/sleep-network-bootstrap/main/scripts/bootstrap.ps1 | iex
+$env:SLEEPNET_MODE='check'; irm https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/main/scripts/bootstrap.ps1 | iex
 ```
 
 ```bash
-SLEEPNET_MODE=check curl -fsSL https://raw.githubusercontent.com/tooltim/sleep-network-bootstrap/main/scripts/install.sh | bash
+SLEEPNET_MODE=check curl -fsSL https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/main/scripts/install.sh | bash
 ```
 
 ## Design notes

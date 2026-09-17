@@ -1,10 +1,10 @@
 {
-  "name": "sleep-network-bootstrap",
+  "name": "sleepmag-installer-note-beta",
   "version": "1.0.0",
   "description": "Cross-platform (Windows / macOS) Node.js installer for the Sleep Network workspace",
   "type": "module",
   "bin": {
-    "sleep-network-bootstrap": "./bin/install.js"
+    "sleepmag-installer-note-beta": "./bin/install.js"
   },
   "engines": {
     "node": ">=18"
@@ -16,7 +16,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/tooltim/sleep-network-bootstrap.git"
+    "url": "https://github.com/tooltim/sleepmag-installer-note-beta.git"
   },
   "license": "MIT",
   "files": [

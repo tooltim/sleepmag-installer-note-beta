@@ -195,7 +195,7 @@ function download(url, dest) {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest);
     const get = url.startsWith('https') ? https.get : http.get;
-    const req = get(url, { headers: { 'User-Agent': 'sleep-network-bootstrap' } }, (res) => {
+    const req = get(url, { headers: { 'User-Agent': 'sleepmag-installer-note-beta' } }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         file.close();
         fs.unlink(dest, () => {});
