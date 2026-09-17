@@ -13,14 +13,15 @@ import { ensureTools } from './tools.js';
 import { ensureWorkspace } from './workspace.js';
 import { resolveAndInstallAssistants, promptLine } from './assistants.js';
 import { runSleepmagSetup, promptPassphrase } from './setup.js';
-import { ensureLauncher } from './launcher.js';
+import { ensureLauncher, openInstalled } from './launcher.js';
 
 export const STEPS = [
   { id: 'tools', label: 'Install / verify tools (Git, Node, Python)' },
   { id: 'workspace', label: 'Download or update workspace' },
   { id: 'setup', label: 'Configure Sleep Network (name, e-mail, passphrase)' },
   { id: 'assistants', label: 'Optional assistants (Claude / Codex)' },
-  { id: 'launcher', label: 'Create desktop shortcut' },
+  { id: 'launcher', label: 'Create Sleep Network Launcher shortcut' },
+  { id: 'open', label: 'Open Sleep Network Launcher' },
 ];
 
 /**
@@ -171,8 +172,15 @@ export async function runInstall(options = {}) {
       return launcher;
     });
 
+    let opened = false;
+    await runStep('open', async () => {
+      opened = openInstalled(launcher, { dryRun });
+      return opened;
+    });
+
     console.log('');
     ok(launcher.hint);
+    if (opened) say('Sleep Network Launcher is opening now…');
     say(
       'First time only: the assistant asks you to log in with your own Claude / OpenAI account, and Claude asks you to trust the folder. Say yes to both.',
     );
@@ -185,12 +193,14 @@ export async function runInstall(options = {}) {
       message: launcher.hint,
       dest: state.dest,
       logPath: logger.logPath,
+      opened,
     });
 
     return {
       mode: 'install',
       dest: state.dest,
       launcher,
+      opened,
       logPath: logger.logPath,
     };
   } finally {

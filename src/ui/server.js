@@ -16,6 +16,8 @@ import { setMessenger } from '../say.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(__dirname, 'public');
+const ASSETS = path.join(__dirname, '..', '..', 'assets');
+const LOGO_PNG = path.join(ASSETS, 'sleepmag-icon.png');
 
 /**
  * @param {{ env?: NodeJS.ProcessEnv, openBrowser?: boolean, port?: number }} [opts]
@@ -66,6 +68,9 @@ export async function startUiServer(opts = {}) {
     }
     if (req.method === 'GET' && url.pathname === '/app.js') {
       return sendFile(res, path.join(PUBLIC, 'app.js'), 'text/javascript; charset=utf-8');
+    }
+    if (req.method === 'GET' && url.pathname === '/logo.png') {
+      return sendFile(res, LOGO_PNG, 'image/png');
     }
 
     if (req.method === 'GET' && url.pathname === '/api/meta') {
@@ -159,6 +164,7 @@ export async function startUiServer(opts = {}) {
                 dest: result.dest,
                 hint: result.launcher?.hint,
                 logPath: result.logPath,
+                opened: Boolean(result.opened),
               },
               ts: new Date().toISOString(),
             });

@@ -71,7 +71,7 @@ describe('logger', () => {
 });
 
 describe('runInstall step order (dry-run)', () => {
-  it('emits tools → workspace → setup → assistants → launcher', async () => {
+  it('emits tools → workspace → setup → assistants → launcher → open', async () => {
     const seen = [];
     const logPath = path.join(os.tmpdir(), `sleepnet-order-${Date.now()}.log`);
     const logger = createLogger({ logPath });
@@ -93,6 +93,7 @@ describe('runInstall step order (dry-run)', () => {
     assert.equal(result.mode, 'install');
     assert.deepEqual(seen, STEPS.map((s) => s.id));
     assert.ok(result.logPath);
+    assert.equal(typeof result.opened, 'boolean');
   });
 
   it('fails validation before any install step when inputs missing', async () => {

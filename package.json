@@ -24,6 +24,7 @@
     "bin",
     "src",
     "scripts",
+    "assets",
     "Install-SleepNetwork.cmd",
     "README.md",
     "LICENSE"

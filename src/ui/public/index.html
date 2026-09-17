@@ -3,17 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sleep Network installer</title>
+    <title>Sleep Network Launcher — Installer</title>
     <link rel="stylesheet" href="/app.css" />
+    <link rel="icon" href="/logo.png" type="image/png" />
   </head>
   <body>
     <main class="shell">
       <header class="brand">
-        <p class="brand-name">Sleep Network</p>
-        <h1>Installer</h1>
+        <img class="brand-logo" src="/logo.png" alt="" width="48" height="48" />
+        <div>
+          <p class="brand-name">Sleep Network Launcher</p>
+          <h1>Installer</h1>
+        </div>
         <p class="lede">
-          Sets up Git, Node, your private workspace, and a desktop shortcut. Nothing secret is stored in this
-          public installer.
+          Sets up Git, Node, your private workspace, and a desktop launcher. Nothing secret is stored in
+          this public installer.
         </p>
       </header>
 
@@ -54,12 +58,18 @@
             >
           </fieldset>
           <p id="form-error" class="error" hidden></p>
-          <button type="submit" id="start-btn">Start install</button>
+          <button type="submit" id="start-btn">
+            <span class="btn-label">Start install</span>
+            <span class="btn-busy" hidden><span class="spinner" aria-hidden="true"></span> Working…</span>
+          </button>
         </form>
       </section>
 
       <section id="progress-panel" class="panel" hidden>
-        <h2 id="progress-title">Installing…</h2>
+        <h2 id="progress-title" class="progress-title">
+          <span class="spinner title-spinner" aria-hidden="true"></span>
+          <span id="progress-title-text">Installing…</span>
+        </h2>
         <ol id="steps" class="steps"></ol>
         <div class="log-wrap">
           <div class="log-head">

@@ -3,12 +3,15 @@ const progressPanel = document.getElementById('progress-panel');
 const form = document.getElementById('install-form');
 const formError = document.getElementById('form-error');
 const startBtn = document.getElementById('start-btn');
+const btnLabel = startBtn.querySelector('.btn-label');
+const btnBusy = startBtn.querySelector('.btn-busy');
 const stepsEl = document.getElementById('steps');
 const logEl = document.getElementById('log');
 const logPathEl = document.getElementById('log-path');
 const copyBtn = document.getElementById('copy-log');
 const resultEl = document.getElementById('result');
 const progressTitle = document.getElementById('progress-title');
+const progressTitleText = document.getElementById('progress-title-text');
 
 /** @type {Map<string, HTMLLIElement>} */
 const stepNodes = new Map();
@@ -77,10 +80,15 @@ function setStep(id, status) {
   li.className = status || 'pending';
   const mark = li.querySelector('.mark');
   if (!mark) return;
-  if (status === 'running') mark.textContent = '●';
-  else if (status === 'ok') mark.textContent = '✓';
-  else if (status === 'failed') mark.textContent = '✕';
-  else mark.textContent = '○';
+  if (status === 'running') {
+    mark.innerHTML = '<span class="spinner" aria-hidden="true"></span>';
+  } else if (status === 'ok') {
+    mark.textContent = '✓';
+  } else if (status === 'failed') {
+    mark.textContent = '✕';
+  } else {
+    mark.textContent = '○';
+  }
 }
 
 function appendLog(line) {
@@ -88,16 +96,27 @@ function appendLog(line) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+function setBusy(busy) {
+  startBtn.disabled = busy;
+  if (btnLabel) btnLabel.hidden = busy;
+  if (btnBusy) btnBusy.hidden = !busy;
+}
+
 function showResult(kind, ev) {
-  progressTitle.textContent = kind === 'ok' ? 'Installed' : 'Install failed';
+  progressTitle.classList.toggle('is-done', kind === 'ok');
+  progressTitle.classList.toggle('is-failed', kind === 'failed');
+  progressTitleText.textContent = kind === 'ok' ? 'Installed' : 'Install failed';
   resultEl.hidden = false;
   resultEl.className = `result ${kind}`;
   if (kind === 'ok') {
     const hint = ev.result?.hint || ev.message || 'Done.';
     const dest = ev.result?.dest || '';
+    const opened = ev.result?.opened || ev.opened;
     resultEl.innerHTML = `<h3>All set</h3><p>${escapeHtml(hint)}</p>${
-      dest ? `<p>Workspace: <code>${escapeHtml(dest)}</code></p>` : ''
-    }<p>You can close this tab.</p>`;
+      opened
+        ? '<p>Opening <strong>Sleep Network Launcher</strong> now…</p>'
+        : '<p>Double-click <strong>Sleep Network Launcher</strong> on your desktop.</p>'
+    }${dest ? `<p>Workspace: <code>${escapeHtml(dest)}</code></p>` : ''}<p>You can close this tab.</p>`;
   } else {
     const err = ev.error || {};
     const step = err.stepLabel || err.step || 'unknown';
@@ -126,7 +145,7 @@ form.addEventListener('submit', async (e) => {
     assistant,
   };
 
-  startBtn.disabled = true;
+  setBusy(true);
   const res = await fetch('/api/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -134,7 +153,7 @@ form.addEventListener('submit', async (e) => {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.ok === false) {
-    startBtn.disabled = false;
+    setBusy(false);
     formError.hidden = false;
     formError.textContent = (data.errors || [data.error || 'Could not start']).join(' ');
     return;
@@ -142,6 +161,8 @@ form.addEventListener('submit', async (e) => {
 
   formPanel.hidden = true;
   progressPanel.hidden = false;
+  progressTitle.classList.remove('is-done', 'is-failed');
+  progressTitleText.textContent = 'Installing…';
   if (data.logPath) {
     logPath = data.logPath;
     logPathEl.textContent = logPath;

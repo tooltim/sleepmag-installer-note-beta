@@ -57,9 +57,9 @@ node sleepmag-installer-note-beta/bin/install.js --cli
 
 | OS | When it finishes |
 |----|------------------|
-| **Windows** | A **Sleep Network** shortcut (`.lnk`) on your Desktop. Double-click it. |
-| **macOS** | A **Sleep Network.command** file on your Desktop. Double-click it (first time: right-click → **Open** if Gatekeeper warns). |
-| **Linux** | A `sleep-network.desktop` entry under `~/.local/share/applications` (and on Desktop when that folder exists). Or run `node ~/Documents/sleep-network/tools/sleepmag/cli.mjs`. |
+| **Windows** | A **Sleep Network Launcher** shortcut (`.lnk`, with Sleep Magazine logo) on your Desktop. It opens automatically after install. |
+| **macOS** | A **Sleep Network Launcher.command** file on your Desktop. Double-click it (first time: right-click → **Open** if Gatekeeper warns). |
+| **Linux** | A `sleep-network-launcher.desktop` entry under `~/.local/share/applications` (and on Desktop when that folder exists). Or run `node ~/Documents/sleep-network/tools/sleepmag/cli.mjs`. |
 
 Workspace location: your OS **Documents** folder `/ sleep-network` (follows OneDrive / iCloud redirects when the OS reports them).
 

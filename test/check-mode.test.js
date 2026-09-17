@@ -77,11 +77,11 @@ describe('checkReport formatting', () => {
 describe('doneLooksLike', () => {
   it('documents Windows shortcut', () => {
     const d = doneLooksLike('win32');
-    assert.match(d.shortcut, /\.lnk/);
+    assert.match(d.shortcut, /Sleep Network Launcher\.lnk/);
   });
   it('documents macOS .command', () => {
     const d = doneLooksLike('darwin');
-    assert.match(d.shortcut, /\.command/);
+    assert.match(d.shortcut, /Sleep Network Launcher\.command/);
   });
 });
 
