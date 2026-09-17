@@ -10,9 +10,10 @@
     "node": ">=18"
   },
   "scripts": {
-    "start": "node bin/install.js",
+    "start": "node bin/install.js --ui",
+    "start:cli": "node bin/install.js --cli",
     "test": "node --test test/*.test.js",
-    "check": "SLEEPNET_MODE=check node bin/install.js"
+    "check": "SLEEPNET_MODE=check node bin/install.js --cli"
   },
   "repository": {
     "type": "git",
@@ -23,6 +24,8 @@
     "bin",
     "src",
     "scripts",
-    "README.md"
+    "Install-SleepNetwork.cmd",
+    "README.md",
+    "LICENSE"
   ]
 }

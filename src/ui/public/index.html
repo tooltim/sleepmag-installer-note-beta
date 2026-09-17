@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sleep Network installer</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="brand">
+        <p class="brand-name">Sleep Network</p>
+        <h1>Installer</h1>
+        <p class="lede">
+          Sets up Git, Node, your private workspace, and a desktop shortcut. Nothing secret is stored in this
+          public installer.
+        </p>
+      </header>
+
+      <section id="form-panel" class="panel">
+        <form id="install-form" autocomplete="on">
+          <label>
+            First name
+            <input id="name" name="name" type="text" required autocomplete="given-name" />
+          </label>
+          <label>
+            Work e-mail
+            <input id="email" name="email" type="email" required autocomplete="email" />
+          </label>
+          <label>
+            Team passphrase
+            <input
+              id="passphrase"
+              name="passphrase"
+              type="password"
+              required
+              autocomplete="current-password"
+              placeholder="Tim gives you this"
+            />
+          </label>
+          <fieldset>
+            <legend>Which assistant do you use?</legend>
+            <label class="radio"
+              ><input type="radio" name="assistant" value="claude" /> Claude Code</label
+            >
+            <label class="radio"
+              ><input type="radio" name="assistant" value="codex" /> Codex</label
+            >
+            <label class="radio"
+              ><input type="radio" name="assistant" value="both" /> Both</label
+            >
+            <label class="radio"
+              ><input type="radio" name="assistant" value="none" checked /> Already installed / skip</label
+            >
+          </fieldset>
+          <p id="form-error" class="error" hidden></p>
+          <button type="submit" id="start-btn">Start install</button>
+        </form>
+      </section>
+
+      <section id="progress-panel" class="panel" hidden>
+        <h2 id="progress-title">Installing…</h2>
+        <ol id="steps" class="steps"></ol>
+        <div class="log-wrap">
+          <div class="log-head">
+            <span>Live log</span>
+            <button type="button" id="copy-log" class="ghost">Copy log</button>
+          </div>
+          <pre id="log" class="log" aria-live="polite"></pre>
+          <p class="log-path">Log file: <code id="log-path"></code></p>
+        </div>
+        <div id="result" class="result" hidden></div>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

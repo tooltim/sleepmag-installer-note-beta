@@ -4,17 +4,21 @@ Cross-platform **Node.js** installer for the private [`tooltim/sleep-network`](h
 
 Public on purpose: teammates can download it before they have access to anything else. It contains **no secrets**. It installs Git / Node / (optional) Python if missing, clones the private workspace (GitHub asks you to log in), runs `tools/sleepmag/cli.mjs setup`, and creates a desktop launcher where the OS allows.
 
+The default experience is a **guided browser UI**: enter name / e-mail / passphrase, watch each step, and if something fails the page stays open with the failed step and a full error log (also saved under your temp folder as `sleepnet-install.log`).
+
 > The older Windows-only PowerShell installer lives in [`sleep-network-install`](https://github.com/tooltim/sleep-network-install) and is **unchanged**. Use this repo for Windows **and** macOS (Linux best-effort).
 
 ## Install
 
-### Windows (PowerShell)
+### Windows (recommended)
+
+Download and double-click [`Install-SleepNetwork.cmd`](https://github.com/tooltim/sleepmag-installer-note-beta/raw/main/Install-SleepNetwork.cmd). Your browser opens the installer — no need to paste commands into CMD.
+
+Or from PowerShell:
 
 ```powershell
 irm https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/main/scripts/bootstrap.ps1 | iex
 ```
-
-Or download and double-click [`Install-SleepNetwork.cmd`](https://github.com/tooltim/sleepmag-installer-note-beta/raw/main/Install-SleepNetwork.cmd).
 
 ### macOS (Terminal)
 
@@ -40,7 +44,13 @@ Or clone and run:
 
 ```bash
 git clone https://github.com/tooltim/sleepmag-installer-note-beta.git
-node sleepmag-installer-note-beta/bin/install.js
+node sleepmag-installer-note-beta/bin/install.js --ui
+```
+
+Console / automation mode:
+
+```bash
+node sleepmag-installer-note-beta/bin/install.js --cli
 ```
 
 ## What “done” looks like
@@ -53,6 +63,12 @@ node sleepmag-installer-note-beta/bin/install.js
 
 Workspace location: your OS **Documents** folder `/ sleep-network` (follows OneDrive / iCloud redirects when the OS reports them).
 
+## If something fails
+
+1. The installer UI shows **which step** failed.
+2. Use **Copy log** (or open the path shown, usually `%TEMP%\sleepnet-install.log` on Windows).
+3. Send that log to Tim.
+
 ## Environment variables (unattended / CI)
 
 | Variable | Purpose |
@@ -63,6 +79,9 @@ Workspace location: your OS **Documents** folder `/ sleep-network` (follows OneD
 | `SLEEPNET_PASSPHRASE` | Skip passphrase prompt |
 | `SLEEPNET_ASSISTANT` | `claude` \| `codex` \| `both` \| `none` |
 | `SLEEPNET_DRY_RUN=1` | Skip mutating side effects (tests) |
+| `SLEEPNET_UI=0` | Force console CLI instead of browser UI |
+
+When name, e-mail, and passphrase are all set via env, the installer runs in CLI mode (no browser).
 
 Example check:
 
@@ -80,13 +99,16 @@ SLEEPNET_MODE=check curl -fsSL https://raw.githubusercontent.com/tooltim/sleepma
 - Detects Git/Node/Python on `PATH` (and common install dirs) **before** installing.
 - Windows winget calls use `--source winget` to avoid Microsoft Store cert failures (`0x8a15005e`).
 - Optional Claude Code / Codex installs never abort setup if they fail or stay off `PATH`.
-- sleepmag exit codes that only complain about missing `claude`/`codex` soft-continue when passphrase + platform steps succeeded (same idea as the PowerShell installer).
+- sleepmag exit codes that only complain about missing `claude`/`codex` soft-continue when passphrase + platform steps succeeded.
+- Step order matches the legacy PowerShell installer: tools → workspace → setup → assistants → launcher.
 
 ## Development
 
 ```bash
 npm test
-SLEEPNET_MODE=check node bin/install.js
+npm start          # UI
+npm run start:cli  # console
+SLEEPNET_MODE=check npm run check
 ```
 
 See [`docs/MANUAL-TEST-MATRIX.md`](docs/MANUAL-TEST-MATRIX.md) for Windows/macOS verification status.

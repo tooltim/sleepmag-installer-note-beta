@@ -1,8 +1,9 @@
 # Sleep Network bootstrap (Windows). Idempotent thin wrapper.
-# Ensures Node.js is on PATH, then runs the Node installer from this repo.
+# Ensures Node.js is on PATH, then launches the guided installer UI.
 # Modes via env (same as the Node installer / legacy install.ps1):
 #   SLEEPNET_MODE=check
 #   SLEEPNET_NAME / SLEEPNET_EMAIL / SLEEPNET_PASSPHRASE / SLEEPNET_ASSISTANT
+#   SLEEPNET_UI=0   force console CLI instead of browser UI
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -72,17 +73,18 @@ Ok ("node " + (& $node --version))
 $BootstrapDir = Join-Path $env:TEMP 'sleepmag-installer-note-beta'
 $Repo = 'https://github.com/tooltim/sleepmag-installer-note-beta.git'
 if (-not (Have 'git')) {
-    Say "Git not found — the Node installer will install it; cloning bootstrap via zip…"
+    Say "Git not found — downloading bootstrap zip…"
     $zip = Join-Path $env:TEMP 'sleepmag-installer-note-beta.zip'
     Invoke-WebRequest 'https://github.com/tooltim/sleepmag-installer-note-beta/archive/refs/heads/main.zip' -OutFile $zip
+    $extractRoot = Join-Path $env:TEMP 'sleepmag-installer-note-beta-extract'
+    if (Test-Path $extractRoot) { Remove-Item -Recurse -Force $extractRoot }
     if (Test-Path $BootstrapDir) { Remove-Item -Recurse -Force $BootstrapDir }
-    Expand-Archive -Path $zip -DestinationPath $env:TEMP -Force
-    $extracted = Join-Path $env:TEMP 'sleepmag-installer-note-beta-main'
-    if (Test-Path $extracted) {
-        Rename-Item $extracted 'sleepmag-installer-note-beta' -ErrorAction SilentlyContinue
-        $BootstrapDir = Join-Path $env:TEMP 'sleepmag-installer-note-beta'
-        if (-not (Test-Path $BootstrapDir)) { $BootstrapDir = $extracted }
-    }
+    New-Item -ItemType Directory -Path $extractRoot | Out-Null
+    Expand-Archive -Path $zip -DestinationPath $extractRoot -Force
+    $extracted = Get-ChildItem $extractRoot -Directory | Select-Object -First 1
+    if (-not $extracted) { throw "Zip extract failed — no folder under $extractRoot" }
+    Move-Item -Path $extracted.FullName -Destination $BootstrapDir
+    Remove-Item -Recurse -Force $extractRoot -ErrorAction SilentlyContinue
 } else {
     if (-not (Test-Path (Join-Path $BootstrapDir '.git'))) {
         if (Test-Path $BootstrapDir) { Remove-Item -Recurse -Force $BootstrapDir }
@@ -94,5 +96,15 @@ if (-not (Have 'git')) {
 
 $entry = Join-Path $BootstrapDir 'bin\install.js'
 if (-not (Test-Path $entry)) { throw "Bootstrap entry not found at $entry" }
-& $node $entry
+
+# Default: guided UI. Pass --cli when SLEEPNET_UI=0 or check mode.
+$installArgs = @($entry)
+if ($env:SLEEPNET_MODE -eq 'check' -or $env:SLEEPNET_UI -eq '0') {
+    $installArgs += '--cli'
+} else {
+    $installArgs += '--ui'
+}
+
+Say "Opening the installer…"
+& $node @installArgs
 exit $LASTEXITCODE

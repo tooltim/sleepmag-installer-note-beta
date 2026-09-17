@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sleep Network bootstrap (macOS / Linux). Idempotent thin wrapper.
-# Ensures Node.js is on PATH, then runs the Node installer from this repo.
+# Ensures Node.js is on PATH, then launches the guided installer UI.
 set -euo pipefail
 
 say() { printf '  %s\n' "$*"; }
@@ -27,7 +27,6 @@ ensure_node() {
     say "Install Node 18+ from https://nodejs.org, then re-run."
     exit 1
   fi
-  # Refresh common brew paths in this shell
   export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
   if ! have node; then
     say "Node still missing after install attempt."
@@ -51,10 +50,18 @@ if have git; then
 else
   say "Git not found — downloading bootstrap zip…"
   ZIP="${TMPDIR:-/tmp}/sleepmag-installer-note-beta.zip"
+  EXTRACT_ROOT="${TMPDIR:-/tmp}/sleepmag-installer-note-beta-extract"
   curl -fsSL -o "$ZIP" "https://github.com/tooltim/sleepmag-installer-note-beta/archive/refs/heads/main.zip"
-  rm -rf "$BOOTSTRAP_DIR" "${TMPDIR:-/tmp}/sleepmag-installer-note-beta-main"
-  unzip -q "$ZIP" -d "${TMPDIR:-/tmp}"
-  mv "${TMPDIR:-/tmp}/sleepmag-installer-note-beta-main" "$BOOTSTRAP_DIR"
+  rm -rf "$BOOTSTRAP_DIR" "$EXTRACT_ROOT"
+  mkdir -p "$EXTRACT_ROOT"
+  unzip -q "$ZIP" -d "$EXTRACT_ROOT"
+  EXTRACTED="$(find "$EXTRACT_ROOT" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  if [[ -z "$EXTRACTED" ]]; then
+    say "Zip extract failed under $EXTRACT_ROOT"
+    exit 1
+  fi
+  mv "$EXTRACTED" "$BOOTSTRAP_DIR"
+  rm -rf "$EXTRACT_ROOT"
 fi
 
 ENTRY="$BOOTSTRAP_DIR/bin/install.js"
@@ -63,4 +70,12 @@ if [[ ! -f "$ENTRY" ]]; then
   exit 1
 fi
 
-exec node "$ENTRY"
+ARGS=("$ENTRY")
+if [[ "${SLEEPNET_MODE:-}" == "check" || "${SLEEPNET_UI:-}" == "0" ]]; then
+  ARGS+=(--cli)
+else
+  ARGS+=(--ui)
+fi
+
+say "Opening the installer…"
+exec node "${ARGS[@]}"

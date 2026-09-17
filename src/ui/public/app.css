@@ -1,0 +1,256 @@
+:root {
+  --bg0: #1a2330;
+  --bg1: #243044;
+  --ink: #f3efe6;
+  --muted: #b7c0cc;
+  --accent: #3d9b8f;
+  --accent-ink: #06231f;
+  --danger: #e07a6a;
+  --ok: #7dba6d;
+  --pending: #6b7788;
+  --card: rgba(255, 255, 255, 0.06);
+  --line: rgba(255, 255, 255, 0.12);
+  --font-display: "Segoe UI Semibold", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "Consolas", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--ink);
+  background:
+    radial-gradient(900px 500px at 10% -10%, #35506e 0%, transparent 55%),
+    radial-gradient(700px 420px at 100% 0%, #2a4a45 0%, transparent 50%),
+    linear-gradient(160deg, var(--bg0), var(--bg1));
+}
+
+.shell {
+  width: min(720px, calc(100% - 2rem));
+  margin: 2.5rem auto 3rem;
+}
+
+.brand-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  letter-spacing: 0.02em;
+}
+
+.brand h1 {
+  margin: 0.15rem 0 0.65rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.15rem;
+  color: var(--muted);
+}
+
+.lede {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+  line-height: 1.45;
+  max-width: 38rem;
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.25rem 1.35rem 1.4rem;
+  backdrop-filter: blur(8px);
+}
+
+form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--ink);
+  padding: 0.65rem 0.75rem;
+  font: inherit;
+}
+
+input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+fieldset {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 0;
+  padding: 0.75rem 0.9rem 0.9rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+legend {
+  padding: 0 0.25rem;
+  color: var(--muted);
+}
+
+.radio {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.75rem 1.1rem;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.error {
+  color: var(--danger);
+  margin: 0;
+}
+
+.steps {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.steps li {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid transparent;
+}
+
+.steps li .mark {
+  width: 1.1rem;
+  text-align: center;
+  color: var(--pending);
+  flex: 0 0 auto;
+}
+
+.steps li.running {
+  border-color: rgba(61, 155, 143, 0.45);
+}
+
+.steps li.ok .mark {
+  color: var(--ok);
+}
+
+.steps li.failed {
+  border-color: rgba(224, 122, 106, 0.55);
+}
+
+.steps li.failed .mark {
+  color: var(--danger);
+}
+
+.log-wrap {
+  margin-top: 0.5rem;
+}
+
+.log-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.35rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.log {
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-path {
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.log-path code {
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.result {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+
+.result.ok {
+  border-color: rgba(125, 186, 109, 0.5);
+  background: rgba(125, 186, 109, 0.1);
+}
+
+.result.failed {
+  border-color: rgba(224, 122, 106, 0.55);
+  background: rgba(224, 122, 106, 0.1);
+}
+
+.result h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.05rem;
+}
+
+.result p {
+  margin: 0.35rem 0;
+  color: var(--muted);
+}

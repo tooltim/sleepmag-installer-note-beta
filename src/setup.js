@@ -3,10 +3,12 @@
  */
 
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import { joinPath, pathExists, platformInfo } from './platform.js';
 import { run } from './exec.js';
 import { say } from './say.js';
-import { promptLine } from './assistants.js';
+
+const require = createRequire(import.meta.url);
 
 /**
  * Decide whether a non-zero sleepmag exit is acceptable.
@@ -23,8 +25,7 @@ export function evaluateSetupResult(setupText, setupExit) {
   const assistantMissOnly = [...text.matchAll(/Command not found:\s*(claude|codex)\b/gi)];
   const scrubbed = text.replace(/^.*Command not found:\s*(claude|codex)\b.*\r?\n?/gim, '');
   const otherHardFail = /(Command not found:|❌|✖|\bfatal\b|\berror\b)/i.test(scrubbed);
-  const requiredOk =
-    /passphrase stored/i.test(text) && /platform/i.test(text);
+  const requiredOk = /passphrase stored/i.test(text) && /platform/i.test(text);
 
   if (assistantMissOnly.length > 0 && !otherHardFail && requiredOk) {
     const missed = [...new Set(assistantMissOnly.map((m) => m[1].toLowerCase()))].join(', ');
@@ -41,16 +42,32 @@ export function evaluateSetupResult(setupText, setupExit) {
  *   email: string|null,
  *   passphrase: string|null,
  *   dryRun?: boolean,
+ *   promptIfMissing?: boolean,
  * }} opts
  */
 export async function runSleepmagSetup(opts) {
   let { name, email, passphrase } = opts;
-  if (!name) name = (await promptLine('Your first name')) || 'User';
-  if (!email) email = (await promptLine('Your work e-mail')) || '';
-  if (!passphrase) {
-    passphrase = await promptPassphrase(
-      'Team passphrase (Tim gives it to you; typing is hidden)',
-    );
+  const promptIfMissing = opts.promptIfMissing !== false;
+
+  if (promptIfMissing) {
+    const { promptLine } = await import('./assistants.js');
+    if (!name) name = (await promptLine('Your first name')) || '';
+    if (!email) email = (await promptLine('Your work e-mail')) || '';
+    if (!passphrase) {
+      passphrase = await promptPassphrase(
+        'Team passphrase (Tim gives it to you; typing is hidden)',
+      );
+    }
+  }
+
+  if (!name || !String(name).trim()) {
+    throw new Error('First name is required for setup.');
+  }
+  if (!email || !String(email).trim()) {
+    throw new Error('Work e-mail is required for setup.');
+  }
+  if (!passphrase || !String(passphrase).trim()) {
+    throw new Error('Team passphrase is required for setup.');
   }
 
   const setupCli = joinPath(opts.dest, 'tools', 'sleepmag', 'cli.mjs');
@@ -58,7 +75,15 @@ export async function runSleepmagSetup(opts) {
     throw new Error(`sleepmag CLI not found at ${setupCli}`);
   }
 
-  const setupArgs = ['setup', '--name', name, '--email', email, '--passphrase', passphrase];
+  const setupArgs = [
+    'setup',
+    '--name',
+    String(name).trim(),
+    '--email',
+    String(email).trim(),
+    '--passphrase',
+    String(passphrase),
+  ];
 
   if (opts.dryRun) {
     say(`[dry-run] would run: node ${setupCli} setup --name … --email … --passphrase …`);
@@ -76,10 +101,13 @@ export async function runSleepmagSetup(opts) {
   } catch {
     /* ignore */
   }
+  say(`setup output also saved to ${logPath}`);
 
   const verdict = evaluateSetupResult(setupText, r.code);
   if (!verdict.ok) {
-    throw new Error(verdict.reason || 'setup failed');
+    throw new Error(
+      `${verdict.reason || 'setup failed'} (see ${logPath} and the install log)`,
+    );
   }
   if (verdict.reason) {
     say(`${verdict.reason} — continuing (not required for setup)`);
@@ -93,43 +121,65 @@ export async function runSleepmagSetup(opts) {
       );
     }
   }
-  return { ok: true, setupText, exit: r.code };
+  return { ok: true, setupText, exit: r.code, setupLogPath: logPath };
 }
 
-async function promptPassphrase(question) {
+/**
+ * Hidden passphrase prompt for CLI mode. Prefer the UI form when possible.
+ * @param {string} question
+ */
+export async function promptPassphrase(question) {
   if (!process.stdin.isTTY) {
     throw new Error('SLEEPNET_PASSPHRASE is required in non-interactive mode');
   }
-  // Best-effort hidden input via readline mute
-  const { createRequire } = await import('node:module');
-  const req = createRequire(import.meta.url);
-  const readline = req('node:readline');
+  const readline = require('node:readline');
   const stdin = process.stdin;
-  const rl = readline.createInterface({ input: stdin, output: process.stdout, terminal: true });
+  const stdout = process.stdout;
+  const rl = readline.createInterface({ input: stdin, output: stdout, terminal: true });
+
   return await new Promise((resolve, reject) => {
-    stdin.on('data', onData);
-    rl.question(`  ${question} `, (answer) => {
+    let muted = false;
+    const onData = (char) => {
+      if (!muted) return;
+      const s = String(char);
+      // Ctrl+C
+      if (s === '\u0003') {
+        cleanup();
+        reject(new Error('cancelled'));
+        return;
+      }
+      // suppress echo of typed chars (readline still collects them)
+      stdout.clearLine?.(0);
+      stdout.cursorTo?.(0);
+      stdout.write(`  ${question} ` + '*'.repeat(rl.line?.length || 0));
+    };
+
+    function cleanup() {
+      muted = false;
       stdin.removeListener('data', onData);
       try {
         stdin.setRawMode?.(false);
       } catch {
         /* ignore */
       }
-      process.stdout.write('\n');
+    }
+
+    muted = true;
+    stdin.on('data', onData);
+    try {
+      stdin.setRawMode?.(true);
+    } catch {
+      /* ignore — still collect input */
+    }
+
+    rl.question(`  ${question} `, (answer) => {
+      cleanup();
+      stdout.write('\n');
       rl.close();
       resolve(answer);
     });
-    function onData() {
-      // Mask: move back and write *
-      try {
-        readline.moveCursor(process.stdout, -1, 0);
-        readline.clearLine(process.stdout, 1);
-        process.stdout.write('*');
-      } catch {
-        /* ignore */
-      }
-    }
     rl.on('SIGINT', () => {
+      cleanup();
       rl.close();
       reject(new Error('cancelled'));
     });
