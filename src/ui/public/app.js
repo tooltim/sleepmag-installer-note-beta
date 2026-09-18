@@ -8,6 +8,7 @@ const btnBusy = startBtn.querySelector('.btn-busy');
 const stepsEl = document.getElementById('steps');
 const logEl = document.getElementById('log');
 const logPathEl = document.getElementById('log-path');
+const logDetails = document.getElementById('log-details');
 const copyBtn = document.getElementById('copy-log');
 const resultEl = document.getElementById('result');
 const progressTitle = document.getElementById('progress-title');
@@ -16,29 +17,36 @@ const progressTitleText = document.getElementById('progress-title-text');
 /** @type {Map<string, HTMLLIElement>} */
 const stepNodes = new Map();
 let logPath = '';
-let finished = false;
 
 async function init() {
-  const meta = await fetch('/api/meta').then((r) => r.json());
-  logPath = meta.logPath || '';
-  logPathEl.textContent = logPath;
-  for (const step of meta.steps || []) {
-    const li = document.createElement('li');
-    li.dataset.step = step.id;
-    li.className = 'pending';
-    li.innerHTML = `<span class="mark">○</span><span class="label">${escapeHtml(step.label)}</span>`;
-    stepsEl.appendChild(li);
-    stepNodes.set(step.id, li);
-  }
-
-  const es = new EventSource('/api/events');
-  es.onmessage = (msg) => {
-    try {
-      handleEvent(JSON.parse(msg.data));
-    } catch {
-      /* ignore */
+  try {
+    const meta = await fetch('/api/meta').then((r) => r.json());
+    logPath = meta.logPath || '';
+    logPathEl.textContent = logPath;
+    for (const step of meta.steps || []) {
+      const li = document.createElement('li');
+      li.dataset.step = step.id;
+      li.className = 'pending';
+      li.innerHTML = `<span class="mark">○</span><span class="label">${escapeHtml(step.label)}</span>`;
+      stepsEl.appendChild(li);
+      stepNodes.set(step.id, li);
     }
-  };
+
+    const es = new EventSource('/api/events');
+    es.onmessage = (msg) => {
+      try {
+        handleEvent(JSON.parse(msg.data));
+      } catch {
+        /* ignore bad events */
+      }
+    };
+    es.onerror = () => {
+      /* keep page usable if SSE drops briefly */
+    };
+  } catch (e) {
+    formError.hidden = false;
+    formError.textContent = 'Could not reach the installer. Close this tab and run the installer again.';
+  }
 }
 
 function handleEvent(ev) {
@@ -52,7 +60,10 @@ function handleEvent(ev) {
 
   if (ev.type === 'step') {
     setStep(ev.step, ev.status);
-    if (ev.message && ev.status === 'failed') appendLog(`STEP ${ev.step} failed: ${ev.message}`);
+    if (ev.message && ev.status === 'failed') {
+      appendLog(`Failed: ${ev.message}`);
+      if (logDetails) logDetails.open = true;
+    }
     return;
   }
 
@@ -63,13 +74,11 @@ function handleEvent(ev) {
   }
 
   if (ev.type === 'done' || (ev.type === 'state' && ev.status === 'ok')) {
-    finished = true;
     showResult('ok', ev);
     return;
   }
 
   if (ev.type === 'state' && ev.status === 'failed') {
-    finished = true;
     showResult('failed', ev);
   }
 }
@@ -105,72 +114,79 @@ function setBusy(busy) {
 function showResult(kind, ev) {
   progressTitle.classList.toggle('is-done', kind === 'ok');
   progressTitle.classList.toggle('is-failed', kind === 'failed');
-  progressTitleText.textContent = kind === 'ok' ? 'Installed' : 'Install failed';
+  progressTitleText.textContent = kind === 'ok' ? 'Ready' : 'Something went wrong';
   resultEl.hidden = false;
   resultEl.className = `result ${kind}`;
   if (kind === 'ok') {
-    const hint = ev.result?.hint || ev.message || 'Done.';
     const dest = ev.result?.dest || '';
     const opened = ev.result?.opened || ev.opened;
-    resultEl.innerHTML = `<h3>All set</h3><p>${escapeHtml(hint)}</p>${
-      opened
-        ? '<p>Opening <strong>Sleep Network Launcher</strong> now…</p>'
-        : '<p>Double-click <strong>Sleep Network Launcher</strong> on your desktop.</p>'
-    }${dest ? `<p>Workspace: <code>${escapeHtml(dest)}</code></p>` : ''}<p>You can close this tab.</p>`;
+    resultEl.innerHTML = `<h3>You're set</h3>
+      <p>${
+        opened
+          ? '<strong>Sleep Network Launcher</strong> is opening now.'
+          : 'Open <strong>Sleep Network Launcher</strong> on your desktop.'
+      }</p>
+      ${dest ? `<p>Workspace: <code>${escapeHtml(dest)}</code></p>` : ''}
+      <p>You can close this tab.</p>`;
   } else {
     const err = ev.error || {};
-    const step = err.stepLabel || err.step || 'unknown';
+    const step = err.stepLabel || err.step || 'unknown step';
     const msg = err.message || 'Something went wrong.';
     const lp = err.logPath || logPath;
     logPathEl.textContent = lp;
+    if (logDetails) logDetails.open = true;
     resultEl.innerHTML = `<h3>Stopped at: ${escapeHtml(step)}</h3>
       <p>${escapeHtml(msg)}</p>
-      <p>Send Tim the log below (or the file at <code>${escapeHtml(lp)}</code>).</p>
-      <p>Keep this tab open until you have copied the log.</p>`;
+      <p>Click <strong>Copy log</strong> and send it to Tim.</p>
+      <p>Keep this tab open until you have the log.</p>`;
   }
 }
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   formError.hidden = true;
-  const assistant =
-    /** @type {HTMLInputElement|null} */ (
-      form.querySelector('input[name="assistant"]:checked')
-    )?.value || 'none';
 
   const payload = {
     name: /** @type {HTMLInputElement} */ (document.getElementById('name')).value,
     email: /** @type {HTMLInputElement} */ (document.getElementById('email')).value,
     passphrase: /** @type {HTMLInputElement} */ (document.getElementById('passphrase')).value,
-    assistant,
+    assistant: /** @type {HTMLSelectElement} */ (document.getElementById('assistant')).value || 'none',
   };
 
   setBusy(true);
-  const res = await fetch('/api/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.ok === false) {
+  try {
+    const res = await fetch('/api/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) {
+      setBusy(false);
+      formError.hidden = false;
+      formError.textContent = (data.errors || [data.error || 'Could not start']).join(' ');
+      return;
+    }
+
+    formPanel.hidden = true;
+    progressPanel.hidden = false;
+    progressTitle.classList.remove('is-done', 'is-failed');
+    progressTitleText.textContent = 'Working…';
+    if (data.logPath) {
+      logPath = data.logPath;
+      logPathEl.textContent = logPath;
+    }
+    appendLog('Starting…');
+  } catch {
     setBusy(false);
     formError.hidden = false;
-    formError.textContent = (data.errors || [data.error || 'Could not start']).join(' ');
-    return;
+    formError.textContent = 'Could not start. Close this tab and run the installer again.';
   }
-
-  formPanel.hidden = true;
-  progressPanel.hidden = false;
-  progressTitle.classList.remove('is-done', 'is-failed');
-  progressTitleText.textContent = 'Installing…';
-  if (data.logPath) {
-    logPath = data.logPath;
-    logPathEl.textContent = logPath;
-  }
-  appendLog('Starting install…');
 });
 
-copyBtn.addEventListener('click', async () => {
+copyBtn.addEventListener('click', async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
   try {
     const text = await fetch('/api/log').then((r) => r.text());
     await navigator.clipboard.writeText(text);
@@ -191,5 +207,4 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-void finished;
 init();

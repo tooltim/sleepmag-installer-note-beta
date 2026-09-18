@@ -40,10 +40,30 @@ function wantUi() {
 }
 
 async function run() {
+  process.on('uncaughtException', (err) => {
+    console.error('');
+    console.error(`  ERROR  ${err?.message || err}`);
+    console.error('');
+    process.exitCode = 1;
+  });
+  process.on('unhandledRejection', (err) => {
+    console.error('');
+    console.error(`  ERROR  ${err?.message || err}`);
+    console.error('');
+    process.exitCode = 1;
+  });
+
   if (wantUi()) {
-    await startUiServer({ openBrowser: true });
-    // Keep process alive for the UI server until the user closes it.
-    await new Promise(() => {});
+    try {
+      await startUiServer({ openBrowser: true });
+      await new Promise(() => {});
+    } catch (err) {
+      console.error('');
+      console.error(`  ERROR  Could not open the installer UI: ${err?.message || err}`);
+      console.error('  Tip: run with --cli if the browser UI cannot start.');
+      console.error('');
+      process.exitCode = 1;
+    }
     return;
   }
 

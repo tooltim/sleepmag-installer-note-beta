@@ -1,17 +1,17 @@
 :root {
-  --bg0: #1a2330;
-  --bg1: #243044;
-  --ink: #f3efe6;
-  --muted: #b7c0cc;
-  --accent: #3d9b8f;
-  --accent-ink: #06231f;
-  --danger: #e07a6a;
-  --ok: #7dba6d;
-  --pending: #6b7788;
-  --card: rgba(255, 255, 255, 0.06);
-  --line: rgba(255, 255, 255, 0.12);
-  --font-display: "Segoe UI Semibold", "Segoe UI", system-ui, sans-serif;
-  --font-body: "Segoe UI", system-ui, sans-serif;
+  --bg: #f7f5f1;
+  --bg-deep: #efece6;
+  --ink: #121212;
+  --muted: #5c5c5c;
+  --line: #d8d2c8;
+  --card: #ffffff;
+  --accent: #121212;
+  --accent-ink: #f7f5f1;
+  --danger: #8a2e2e;
+  --ok: #2f5d3a;
+  --pending: #8a857c;
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-body: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: "Cascadia Mono", "Consolas", monospace;
 }
 
@@ -29,166 +29,92 @@ body {
   font-family: var(--font-body);
   color: var(--ink);
   background:
-    radial-gradient(900px 500px at 10% -10%, #35506e 0%, transparent 55%),
-    radial-gradient(700px 420px at 100% 0%, #2a4a45 0%, transparent 50%),
-    linear-gradient(160deg, var(--bg0), var(--bg1));
+    radial-gradient(1200px 600px at 50% -20%, #ffffff 0%, transparent 55%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
 }
 
 .shell {
-  width: min(720px, calc(100% - 2rem));
-  margin: 2.5rem auto 3rem;
+  width: min(560px, calc(100% - 2rem));
+  margin: 2.75rem auto 3rem;
 }
 
 .brand {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.35rem 0.85rem;
-  align-items: center;
-  margin-bottom: 0.25rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
 }
 
-.brand-logo {
-  grid-row: span 2;
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-}
-
-.brand .lede {
-  grid-column: 1 / -1;
+.brand-lockup {
+  display: block;
+  width: min(280px, 70%);
+  height: auto;
+  margin: 0 auto 1.1rem;
 }
 
 .brand-name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.55rem;
-  letter-spacing: 0.02em;
-}
-
-.brand h1 {
-  margin: 0.15rem 0 0;
-  font-family: var(--font-display);
+  font-size: 1.85rem;
   font-weight: 600;
-  font-size: 1.15rem;
-  color: var(--muted);
+  letter-spacing: 0.01em;
 }
 
 .lede {
-  margin: 0.85rem 0 1.5rem;
+  margin: 0.45rem auto 0;
   color: var(--muted);
   line-height: 1.45;
-  max-width: 38rem;
-}
-
-.progress-title {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  margin: 0 0 1rem;
-  font-size: 1.15rem;
-}
-
-.progress-title.is-done .title-spinner,
-.progress-title.is-failed .title-spinner {
-  display: none;
-}
-
-.spinner {
-  display: inline-block;
-  width: 0.95rem;
-  height: 0.95rem;
-  border: 2px solid rgba(255, 255, 255, 0.18);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  flex: 0 0 auto;
-  vertical-align: middle;
-}
-
-.btn-busy {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-
-.btn-busy .spinner {
-  width: 0.85rem;
-  height: 0.85rem;
-  border-top-color: var(--accent-ink);
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  max-width: 28rem;
+  font-size: 0.98rem;
 }
 
 .panel {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 1.25rem 1.35rem 1.4rem;
-  backdrop-filter: blur(8px);
+  border-radius: 2px;
+  padding: 1.35rem 1.4rem 1.5rem;
+  box-shadow: 0 10px 40px rgba(18, 18, 18, 0.04);
 }
 
 form {
   display: grid;
-  gap: 0.9rem;
+  gap: 0.95rem;
 }
 
 label {
   display: grid;
   gap: 0.35rem;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
+  color: var(--muted);
 }
 
 input[type="text"],
 input[type="email"],
-input[type="password"] {
+input[type="password"],
+select {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.25);
+  border-radius: 2px;
+  background: #fff;
   color: var(--ink);
-  padding: 0.65rem 0.75rem;
+  padding: 0.7rem 0.75rem;
   font: inherit;
 }
 
-input:focus {
-  outline: 2px solid var(--accent);
+input:focus,
+select:focus {
+  outline: 2px solid var(--ink);
   outline-offset: 1px;
-}
-
-fieldset {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  margin: 0;
-  padding: 0.75rem 0.9rem 0.9rem;
-  display: grid;
-  gap: 0.4rem;
-}
-
-legend {
-  padding: 0 0.25rem;
-  color: var(--muted);
-}
-
-.radio {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
 button {
   font: inherit;
   cursor: pointer;
   border: 0;
-  border-radius: 999px;
-  padding: 0.75rem 1.1rem;
+  border-radius: 2px;
+  padding: 0.8rem 1.1rem;
   background: var(--accent);
   color: var(--accent-ink);
   font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 button:disabled {
@@ -200,15 +126,62 @@ button.ghost {
   background: transparent;
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 0.35rem 0.7rem;
+  padding: 0.3rem 0.65rem;
   font-weight: 500;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 }
 
 .error {
   color: var(--danger);
   margin: 0;
+  font-size: 0.92rem;
+}
+
+.progress-title {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.progress-title.is-done .title-spinner,
+.progress-title.is-failed .title-spinner {
+  display: none;
+}
+
+.spinner {
+  display: inline-block;
+  width: 0.95rem;
+  height: 0.95rem;
+  border: 2px solid rgba(18, 18, 18, 0.15);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex: 0 0 auto;
+  vertical-align: middle;
+}
+
+.btn-busy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
+.btn-busy .spinner {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-color: rgba(247, 245, 241, 0.25);
+  border-top-color: var(--accent-ink);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .steps {
@@ -216,17 +189,20 @@ button.ghost {
   margin: 0 0 1rem;
   padding: 0;
   display: grid;
-  gap: 0.45rem;
+  gap: 0.4rem;
 }
 
 .steps li {
   display: flex;
   gap: 0.65rem;
   align-items: flex-start;
-  padding: 0.55rem 0.65rem;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.18);
-  border: 1px solid transparent;
+  padding: 0.55rem 0.15rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.steps li:last-child {
+  border-bottom: 0;
 }
 
 .steps li .mark {
@@ -240,9 +216,8 @@ button.ghost {
   justify-content: center;
 }
 
-.steps li.running .mark {
-  /* spinner replaces glyph */
-  color: transparent;
+.steps li.running {
+  color: var(--ink);
 }
 
 .steps li.running .mark .spinner {
@@ -250,8 +225,8 @@ button.ghost {
   height: 0.9rem;
 }
 
-.steps li.running {
-  border-color: rgba(61, 155, 143, 0.45);
+.steps li.ok {
+  color: var(--ink);
 }
 
 .steps li.ok .mark {
@@ -259,7 +234,7 @@ button.ghost {
 }
 
 .steps li.failed {
-  border-color: rgba(224, 122, 106, 0.55);
+  color: var(--danger);
 }
 
 .steps li.failed .mark {
@@ -267,37 +242,45 @@ button.ghost {
 }
 
 .log-wrap {
-  margin-top: 0.5rem;
+  margin-top: 0.35rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.65rem;
 }
 
-.log-head {
+.log-wrap summary {
+  list-style: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.35rem;
+  cursor: pointer;
   color: var(--muted);
   font-size: 0.9rem;
+  user-select: none;
+}
+
+.log-wrap summary::-webkit-details-marker {
+  display: none;
 }
 
 .log {
-  margin: 0;
-  max-height: 260px;
+  margin: 0.65rem 0 0;
+  max-height: 220px;
   overflow: auto;
   padding: 0.75rem;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--line);
+  background: #faf8f4;
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
+  color: var(--ink);
 }
 
 .log-path {
   margin: 0.55rem 0 0;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
 }
 
 .log-path code {
@@ -307,27 +290,32 @@ button.ghost {
 
 .result {
   margin-top: 1rem;
-  padding: 0.9rem 1rem;
-  border-radius: 10px;
+  padding: 0.95rem 1rem;
   border: 1px solid var(--line);
 }
 
 .result.ok {
-  border-color: rgba(125, 186, 109, 0.5);
-  background: rgba(125, 186, 109, 0.1);
+  border-color: #9bb8a1;
+  background: #f3f7f4;
 }
 
 .result.failed {
-  border-color: rgba(224, 122, 106, 0.55);
-  background: rgba(224, 122, 106, 0.1);
+  border-color: #d2a3a3;
+  background: #faf3f3;
 }
 
 .result h3 {
   margin: 0 0 0.4rem;
-  font-size: 1.05rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
 }
 
 .result p {
   margin: 0.35rem 0;
   color: var(--muted);
+}
+
+.result strong {
+  color: var(--ink);
+  font-weight: 600;
 }

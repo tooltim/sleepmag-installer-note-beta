@@ -91,44 +91,29 @@ export function isWorkspacePresent(dest, platform = process.platform) {
 }
 
 function ensureGitHubAuthReady() {
+  // Soft tips only — never force interactive gh auth login (that hangs UI / confuses coworkers).
   const gh = resolveExe('gh');
   if (!gh) {
-    say(
-      'Tip: for reliable private-repo access, install GitHub CLI (winget install --id GitHub.cli -e --source winget) then run: gh auth login',
-    );
-    say(
-      'Otherwise Git Credential Manager may open a browser during clone — sign in with an account that has access to tooltim/sleep-network.',
-    );
+    say('If Git asks you to sign in, use the GitHub account Tim invited to tooltim/sleep-network.');
     return;
   }
-  const st = run(gh, ['auth', 'status'], { timeout: 30_000 });
-  if (st.code === 0) {
-    run(gh, ['auth', 'setup-git'], { timeout: 30_000 });
-    ok('GitHub CLI authenticated');
-    return;
+  try {
+    const st = run(gh, ['auth', 'status'], { timeout: 15_000 });
+    if (st.code === 0) {
+      run(gh, ['auth', 'setup-git'], { timeout: 15_000 });
+      ok('GitHub CLI already signed in');
+      return;
+    }
+    say('GitHub CLI is installed but not signed in. A browser login may appear during download — that is normal.');
+  } catch {
+    say('If Git asks you to sign in, use the GitHub account Tim invited to tooltim/sleep-network.');
   }
-  say('GitHub CLI found but not logged in — starting gh auth login (browser)…');
-  say('Use the same GitHub account Tim invited to tooltim/sleep-network.');
-  const login = run(gh, ['auth', 'login', '-h', 'github.com', '-p', 'https', '-w'], {
-    timeout: 600_000,
-  });
-  if (login.code === 0) {
-    run(gh, ['auth', 'setup-git'], { timeout: 30_000 });
-    ok('GitHub CLI authenticated');
-    return;
-  }
-  say(
-    `gh auth login did not finish (exit ${login.code}). Git may still prompt via Credential Manager during clone.`,
-  );
 }
 
 function showPrivateRepoAuthHelp(dest) {
-  say('tooltim/sleep-network is a PRIVATE GitHub repo — clone fails with "Repository not found" if you lack access or are not signed in.');
-  say('Fix, then re-run this installer:');
-  say('  1. Ask Tim to invite your GitHub account to https://github.com/tooltim/sleep-network');
-  say('  2. Sign in on this PC (preferred):  gh auth login');
-  say('     Or approve the Git Credential Manager / browser prompt when Git asks.');
-  say('  3. Confirm access:  gh auth status');
-  say('     and:  git ls-remote https://github.com/tooltim/sleep-network.git');
-  if (dest) say(`  4. If a half-downloaded folder exists, delete it:  ${dest}`);
+  say('Could not download the private workspace. Usually that means GitHub access is missing.');
+  say('Fix, then run the installer again:');
+  say('  1. Ask Tim to invite your GitHub account to tooltim/sleep-network');
+  say('  2. Sign in when Git (or gh) asks — same invited account');
+  if (dest) say(`  3. If a half-downloaded folder exists, delete it: ${dest}`);
 }

@@ -3,22 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sleep Network Launcher — Installer</title>
+    <title>Sleep Network</title>
     <link rel="stylesheet" href="/app.css" />
-    <link rel="icon" href="/logo.png" type="image/png" />
+    <link rel="icon" href="/icon.png" type="image/png" />
   </head>
   <body>
     <main class="shell">
       <header class="brand">
-        <img class="brand-logo" src="/logo.png" alt="" width="48" height="48" />
-        <div>
-          <p class="brand-name">Sleep Network Launcher</p>
-          <h1>Installer</h1>
-        </div>
-        <p class="lede">
-          Sets up Git, Node, your private workspace, and a desktop launcher. Nothing secret is stored in
-          this public installer.
-        </p>
+        <img class="brand-lockup" src="/lockup.png" alt="Sleep Magazine" />
+        <p class="brand-name">Sleep Network</p>
+        <p class="lede">One short setup. Then you work from the desktop launcher.</p>
       </header>
 
       <section id="form-panel" class="panel">
@@ -42,27 +36,19 @@
               placeholder="Tim gives you this"
             />
           </label>
-          <fieldset>
-            <legend>Which assistant do you use?</legend>
-            <label class="radio"
-              ><input type="radio" name="assistant" value="claude" /> Claude Code</label
-            >
-            <label class="radio"
-              ><input type="radio" name="assistant" value="codex" /> Codex</label
-            >
-            <label class="radio"
-              ><input type="radio" name="assistant" value="gemini" /> Gemini CLI</label
-            >
-            <label class="radio"
-              ><input type="radio" name="assistant" value="all" /> All three</label
-            >
-            <label class="radio"
-              ><input type="radio" name="assistant" value="none" checked /> Already installed / skip</label
-            >
-          </fieldset>
+          <label>
+            Assistant (optional)
+            <select id="assistant" name="assistant">
+              <option value="none" selected>Skip — already installed</option>
+              <option value="claude">Claude Code</option>
+              <option value="codex">Codex</option>
+              <option value="gemini">Gemini CLI</option>
+              <option value="all">Install all three</option>
+            </select>
+          </label>
           <p id="form-error" class="error" hidden></p>
           <button type="submit" id="start-btn">
-            <span class="btn-label">Start install</span>
+            <span class="btn-label">Continue</span>
             <span class="btn-busy" hidden><span class="spinner" aria-hidden="true"></span> Working…</span>
           </button>
         </form>
@@ -71,17 +57,17 @@
       <section id="progress-panel" class="panel" hidden>
         <h2 id="progress-title" class="progress-title">
           <span class="spinner title-spinner" aria-hidden="true"></span>
-          <span id="progress-title-text">Installing…</span>
+          <span id="progress-title-text">Working…</span>
         </h2>
         <ol id="steps" class="steps"></ol>
-        <div class="log-wrap">
-          <div class="log-head">
-            <span>Live log</span>
+        <details id="log-details" class="log-wrap">
+          <summary>
+            <span>Details</span>
             <button type="button" id="copy-log" class="ghost">Copy log</button>
-          </div>
+          </summary>
           <pre id="log" class="log" aria-live="polite"></pre>
           <p class="log-path">Log file: <code id="log-path"></code></p>
-        </div>
+        </details>
         <div id="result" class="result" hidden></div>
       </section>
     </main>

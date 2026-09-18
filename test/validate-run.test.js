@@ -23,7 +23,7 @@ describe('validateInstallInputs', () => {
       passphrase: 'secret',
     });
     assert.equal(v.ok, false);
-    assert.ok(v.errors.some((e) => /invalid/i.test(e)));
+    assert.ok(v.errors.some((e) => /e-mail|email/i.test(e)));
   });
 
   it('accepts valid inputs and defaults assistant to none', () => {

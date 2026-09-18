@@ -18,6 +18,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(__dirname, 'public');
 const ASSETS = path.join(__dirname, '..', '..', 'assets');
 const LOGO_PNG = path.join(ASSETS, 'sleepmag-icon.png');
+const LOCKUP_PNG = path.join(ASSETS, 'lockup-black.png');
+const ICON_PNG = path.join(ASSETS, 'icon-black.png');
 
 /**
  * @param {{ env?: NodeJS.ProcessEnv, openBrowser?: boolean, port?: number }} [opts]
@@ -71,6 +73,12 @@ export async function startUiServer(opts = {}) {
     }
     if (req.method === 'GET' && url.pathname === '/logo.png') {
       return sendFile(res, LOGO_PNG, 'image/png');
+    }
+    if (req.method === 'GET' && url.pathname === '/lockup.png') {
+      return sendFile(res, LOCKUP_PNG, 'image/png');
+    }
+    if (req.method === 'GET' && url.pathname === '/icon.png') {
+      return sendFile(res, ICON_PNG, 'image/png');
     }
 
     if (req.method === 'GET' && url.pathname === '/api/meta') {

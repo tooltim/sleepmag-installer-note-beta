@@ -16,12 +16,12 @@ import { runSleepmagSetup, promptPassphrase } from './setup.js';
 import { ensureLauncher, openInstalled } from './launcher.js';
 
 export const STEPS = [
-  { id: 'tools', label: 'Install / verify tools (Git, Node, Python)' },
-  { id: 'workspace', label: 'Download or update workspace' },
-  { id: 'assistants', label: 'Optional assistants (Claude / Codex / Gemini)' },
-  { id: 'setup', label: 'Configure Sleep Network (name, e-mail, passphrase)' },
-  { id: 'launcher', label: 'Create Sleep Network Launcher shortcut' },
-  { id: 'open', label: 'Open Sleep Network Launcher' },
+  { id: 'tools', label: 'Check tools' },
+  { id: 'workspace', label: 'Download workspace' },
+  { id: 'assistants', label: 'Optional assistants' },
+  { id: 'setup', label: 'Your account setup' },
+  { id: 'launcher', label: 'Desktop launcher' },
+  { id: 'open', label: 'Open launcher' },
 ];
 
 /**
@@ -174,7 +174,12 @@ export async function runInstall(options = {}) {
 
     let opened = false;
     await runStep('open', async () => {
-      opened = openInstalled(launcher, { dryRun });
+      try {
+        opened = openInstalled(launcher, { dryRun });
+      } catch (e) {
+        say(`Could not open launcher automatically (${e.message || e}) — use the desktop shortcut.`);
+        opened = false;
+      }
       return opened;
     });
 

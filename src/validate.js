@@ -15,8 +15,8 @@ export function validateInstallInputs(input = {}) {
 
   if (!name) errors.push('First name is required.');
   if (!email) errors.push('Work e-mail is required.');
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errors.push('Work e-mail looks invalid (need something like you@company.com).');
+  else if (!email.includes('@') || email.length < 5) {
+    errors.push('Enter a work e-mail like you@company.com.');
   }
   if (!passphrase) errors.push('Team passphrase is required (Tim gives it to you).');
 
