@@ -19,7 +19,7 @@ export const STEPS = [
   { id: 'tools', label: 'Install / verify tools (Git, Node, Python)' },
   { id: 'workspace', label: 'Download or update workspace' },
   { id: 'setup', label: 'Configure Sleep Network (name, e-mail, passphrase)' },
-  { id: 'assistants', label: 'Optional assistants (Claude / Codex)' },
+  { id: 'assistants', label: 'Optional assistants (Claude / Codex / Gemini)' },
   { id: 'launcher', label: 'Create Sleep Network Launcher shortcut' },
   { id: 'open', label: 'Open Sleep Network Launcher' },
 ];
@@ -90,7 +90,7 @@ export async function runInstall(options = {}) {
       }
       if (!assistant) {
         const answer = await promptLine(
-          'Which assistant do you use? [1] Claude Code  [2] Codex  [3] both  [4] already installed / skip',
+          'Which assistant do you use? [1] Claude Code  [2] Codex  [3] Gemini CLI  [4] all  [5] already installed / skip',
         );
         assistant = normalizeAssistant(answer);
       }
@@ -182,7 +182,7 @@ export async function runInstall(options = {}) {
     ok(launcher.hint);
     if (opened) say('Sleep Network Launcher is opening now…');
     say(
-      'First time only: the assistant asks you to log in with your own Claude / OpenAI account, and Claude asks you to trust the folder. Say yes to both.',
+      'First time only: the assistant asks you to log in with your own Claude / OpenAI / Google account, and to trust the folder. Say yes.',
     );
     say(`Install log saved at: ${logger.logPath}`);
     console.log('');

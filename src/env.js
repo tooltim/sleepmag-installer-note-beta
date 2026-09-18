@@ -3,11 +3,11 @@
  *
  * SLEEPNET_MODE=check           — report only, no installs
  * SLEEPNET_NAME / EMAIL / PASSPHRASE — skip prompts
- * SLEEPNET_ASSISTANT=claude|codex|both|none
+ * SLEEPNET_ASSISTANT=claude|codex|gemini|both|all|none
  * SLEEPNET_DRY_RUN=1            — skip mutating side effects (tests / CI)
  */
 
-const ASSISTANTS = new Set(['claude', 'codex', 'both', 'none']);
+const ASSISTANTS = new Set(['claude', 'codex', 'gemini', 'both', 'all', 'none']);
 
 /**
  * @param {NodeJS.ProcessEnv} [env]
@@ -30,7 +30,7 @@ export function parseEnv(env = process.env) {
 /**
  * Normalize an assistant choice from a prompt digit or keyword.
  * @param {string} raw
- * @returns {'claude'|'codex'|'both'|'none'}
+ * @returns {'claude'|'codex'|'gemini'|'both'|'all'|'none'}
  */
 export function normalizeAssistant(raw) {
   const v = String(raw || '').trim().toLowerCase();
@@ -39,13 +39,38 @@ export function normalizeAssistant(raw) {
     claude: 'claude',
     '2': 'codex',
     codex: 'codex',
-    '3': 'both',
-    both: 'both',
-    '4': 'none',
+    '3': 'gemini',
+    gemini: 'gemini',
+    '4': 'all',
+    all: 'all',
+    both: 'both', // legacy: Claude + Codex
+    '5': 'none',
     none: 'none',
     skip: 'none',
   };
   return map[v] || 'none';
+}
+
+/**
+ * Which CLI tools a choice should try to install.
+ * @param {string} assistant
+ * @returns {Array<'claude'|'codex'|'gemini'>}
+ */
+export function assistantTargets(assistant) {
+  switch (assistant) {
+    case 'claude':
+      return ['claude'];
+    case 'codex':
+      return ['codex'];
+    case 'gemini':
+      return ['gemini'];
+    case 'both':
+      return ['claude', 'codex'];
+    case 'all':
+      return ['claude', 'codex', 'gemini'];
+    default:
+      return [];
+  }
 }
 
 function emptyToNull(v) {

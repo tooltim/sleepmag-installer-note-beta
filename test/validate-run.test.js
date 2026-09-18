@@ -44,10 +44,10 @@ describe('validateInstallInputs', () => {
       name: 'Ada',
       email: 'ada@example.com',
       passphrase: 'x',
-      assistant: 'both',
+      assistant: 'gemini',
     });
     assert.equal(v.ok, true);
-    assert.equal(v.assistant, 'both');
+    assert.equal(v.assistant, 'gemini');
   });
 });
 

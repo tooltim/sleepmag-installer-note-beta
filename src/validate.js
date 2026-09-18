@@ -20,7 +20,7 @@ export function validateInstallInputs(input = {}) {
   }
   if (!passphrase) errors.push('Team passphrase is required (Tim gives it to you).');
 
-  const allowed = new Set(['claude', 'codex', 'both', 'none']);
+  const allowed = new Set(['claude', 'codex', 'gemini', 'both', 'all', 'none']);
   if (!allowed.has(assistant)) assistant = 'none';
 
   if (errors.length) return { ok: false, errors };

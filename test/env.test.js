@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { parseEnv, normalizeAssistant } from '../src/env.js';
+import { parseEnv, normalizeAssistant, assistantTargets } from '../src/env.js';
 
 describe('parseEnv', () => {
   it('detects check mode', () => {
@@ -32,6 +32,8 @@ describe('parseEnv', () => {
 
   it('accepts valid assistants and rejects unknown', () => {
     assert.equal(parseEnv({ SLEEPNET_ASSISTANT: 'claude' }).assistant, 'claude');
+    assert.equal(parseEnv({ SLEEPNET_ASSISTANT: 'gemini' }).assistant, 'gemini');
+    assert.equal(parseEnv({ SLEEPNET_ASSISTANT: 'all' }).assistant, 'all');
     assert.equal(parseEnv({ SLEEPNET_ASSISTANT: 'both' }).assistant, 'both');
     assert.equal(parseEnv({ SLEEPNET_ASSISTANT: 'nope' }).assistant, null);
   });
@@ -47,11 +49,23 @@ describe('normalizeAssistant', () => {
   it('maps digits and keywords', () => {
     assert.equal(normalizeAssistant('1'), 'claude');
     assert.equal(normalizeAssistant('2'), 'codex');
-    assert.equal(normalizeAssistant('3'), 'both');
-    assert.equal(normalizeAssistant('4'), 'none');
+    assert.equal(normalizeAssistant('3'), 'gemini');
+    assert.equal(normalizeAssistant('4'), 'all');
+    assert.equal(normalizeAssistant('5'), 'none');
     assert.equal(normalizeAssistant('Claude'), 'claude');
+    assert.equal(normalizeAssistant('gemini'), 'gemini');
+    assert.equal(normalizeAssistant('both'), 'both');
     assert.equal(normalizeAssistant('skip'), 'none');
     assert.equal(normalizeAssistant('garbage'), 'none');
+  });
+});
+
+describe('assistantTargets', () => {
+  it('expands choices to installable CLIs', () => {
+    assert.deepEqual(assistantTargets('gemini'), ['gemini']);
+    assert.deepEqual(assistantTargets('both'), ['claude', 'codex']);
+    assert.deepEqual(assistantTargets('all'), ['claude', 'codex', 'gemini']);
+    assert.deepEqual(assistantTargets('none'), []);
   });
 });
 

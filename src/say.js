@@ -32,7 +32,7 @@ export function done(platformHint) {
   console.log('');
   ok(platformHint);
   say(
-    'First time only: the assistant asks you to log in with your own Claude / OpenAI account, and Claude asks you to trust the folder. Say yes to both.',
+    'First time only: the assistant asks you to log in with your own Claude / OpenAI / Google account, and to trust the folder. Say yes.',
   );
   console.log('');
 }

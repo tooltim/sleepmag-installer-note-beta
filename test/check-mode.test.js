@@ -17,6 +17,7 @@ describe('evaluateSetupResult (check / soft-continue)', () => {
       'platform configured',
       '❌ Command not found: claude',
       'Command not found: codex',
+      'Command not found: gemini',
     ].join('\n');
     const v = evaluateSetupResult(text, 1);
     assert.equal(v.ok, true);
@@ -66,10 +67,10 @@ describe('check-mode snapshot', () => {
 describe('checkReport formatting', () => {
   it('emits one line per tool', () => {
     const lines = checkReport({
-      have: { git: true, node: true, claude: false, codex: false, python: false },
+      have: { git: true, node: true, claude: false, codex: false, gemini: false, python: false },
       workspacePresent: true,
     });
-    assert.equal(lines.length, 6);
+    assert.equal(lines.length, 7);
     assert.equal(lines.at(-1), 'workspace: present');
   });
 });

@@ -14,7 +14,7 @@
  * Env:
  *   SLEEPNET_MODE=check
  *   SLEEPNET_NAME / SLEEPNET_EMAIL / SLEEPNET_PASSPHRASE
- *   SLEEPNET_ASSISTANT=claude|codex|both|none
+ *   SLEEPNET_ASSISTANT=claude|codex|gemini|both|all|none
  *   SLEEPNET_DRY_RUN=1
  *   SLEEPNET_UI=0   force CLI
  */

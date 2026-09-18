@@ -48,6 +48,7 @@ export async function main(options = {}) {
         node: Boolean(resolveExe('node', { env })),
         claude: Boolean(resolveExe('claude', { env })),
         codex: Boolean(resolveExe('codex', { env })),
+        gemini: Boolean(resolveExe('gemini', { env })),
         python: Boolean(
           resolveExe('python', { env }) || resolveExe('python3', { env }),
         ),

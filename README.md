@@ -77,7 +77,7 @@ Workspace location: your OS **Documents** folder `/ sleep-network` (follows OneD
 | `SLEEPNET_NAME` | Skip name prompt |
 | `SLEEPNET_EMAIL` | Skip email prompt |
 | `SLEEPNET_PASSPHRASE` | Skip passphrase prompt |
-| `SLEEPNET_ASSISTANT` | `claude` \| `codex` \| `both` \| `none` |
+| `SLEEPNET_ASSISTANT` | `claude` \| `codex` \| `gemini` \| `both` \| `all` \| `none` |
 | `SLEEPNET_DRY_RUN=1` | Skip mutating side effects (tests) |
 | `SLEEPNET_UI=0` | Force console CLI instead of browser UI |
 
@@ -99,7 +99,7 @@ SLEEPNET_MODE=check curl -fsSL https://raw.githubusercontent.com/tooltim/sleepma
 - Detects Git/Node/Python on `PATH` (and common install dirs) **before** installing.
 - Windows winget calls use `--source winget` to avoid Microsoft Store cert failures (`0x8a15005e`).
 - Optional Claude Code / Codex installs never abort setup if they fail or stay off `PATH`.
-- sleepmag exit codes that only complain about missing `claude`/`codex` soft-continue when passphrase + platform steps succeeded.
+- sleepmag exit codes that only complain about missing `claude`/`codex`/`gemini` soft-continue when passphrase + platform steps succeeded.
 - Step order matches the legacy PowerShell installer: tools → workspace → setup → assistants → launcher.
 
 ## Development

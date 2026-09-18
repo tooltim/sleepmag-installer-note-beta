@@ -218,7 +218,7 @@ function download(url, dest) {
  */
 export function checkReport({ have, workspacePresent }) {
   const lines = [];
-  for (const c of ['git', 'node', 'claude', 'codex', 'python']) {
+  for (const c of ['git', 'node', 'claude', 'codex', 'gemini', 'python']) {
     lines.push(have[c] ? `OK  ${c} found` : `${c} missing`);
   }
   lines.push(`workspace: ${workspacePresent ? 'present' : 'not installed'}`);

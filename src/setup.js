@@ -22,8 +22,8 @@ export function evaluateSetupResult(setupText, setupExit) {
   if (setupExit === 0) return { ok: true };
 
   const text = setupText || '';
-  const assistantMissOnly = [...text.matchAll(/Command not found:\s*(claude|codex)\b/gi)];
-  const scrubbed = text.replace(/^.*Command not found:\s*(claude|codex)\b.*\r?\n?/gim, '');
+  const assistantMissOnly = [...text.matchAll(/Command not found:\s*(claude|codex|gemini)\b/gi)];
+  const scrubbed = text.replace(/^.*Command not found:\s*(claude|codex|gemini)\b.*\r?\n?/gim, '');
   const otherHardFail = /(Command not found:|❌|✖|\bfatal\b|\berror\b)/i.test(scrubbed);
   const requiredOk = /passphrase stored/i.test(text) && /platform/i.test(text);
 
