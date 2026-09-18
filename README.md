@@ -100,7 +100,7 @@ SLEEPNET_MODE=check curl -fsSL https://raw.githubusercontent.com/tooltim/sleepma
 - Windows winget calls use `--source winget` to avoid Microsoft Store cert failures (`0x8a15005e`).
 - Optional Claude Code / Codex installs never abort setup if they fail or stay off `PATH`.
 - sleepmag exit codes that only complain about missing `claude`/`codex`/`gemini` soft-continue when passphrase + platform steps succeeded.
-- Step order matches the legacy PowerShell installer: tools → workspace → setup → assistants → launcher.
+- Step order matches the current PowerShell installer: tools → workspace → assistants → setup → launcher.
 
 ## Development
 

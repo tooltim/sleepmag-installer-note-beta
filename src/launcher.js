@@ -72,14 +72,87 @@ function desktopDir(info) {
   return joinPath(home, 'Desktop');
 }
 
+function getDesktopFolders(info) {
+  const dirs = [];
+  const add = (p) => {
+    if (!p || !pathExists(p)) return;
+    try {
+      const real = fs.realpathSync(p);
+      if (!dirs.includes(real)) dirs.push(real);
+    } catch {
+      if (!dirs.includes(p)) dirs.push(p);
+    }
+  };
+
+  if (info.isWin) {
+    const fromPs = run(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        "[Environment]::GetFolderPath('Desktop'); [Environment]::GetFolderPath('CommonDesktopDirectory')",
+      ],
+      { timeout: 10_000 },
+    );
+    for (const line of String(fromPs.stdout || '')
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean)) {
+      add(line);
+    }
+    for (const root of [
+      process.env.OneDrive,
+      process.env.OneDriveConsumer,
+      process.env.OneDriveCommercial,
+    ].filter(Boolean)) {
+      add(joinPath(root, 'Desktop'));
+    }
+    add(
+      process.env.USERPROFILE
+        ? joinPath(process.env.USERPROFILE, 'Desktop')
+        : joinPath(info.home, 'Desktop'),
+    );
+  } else {
+    add(joinPath(info.home, 'Desktop'));
+  }
+  return dirs;
+}
+
+/**
+ * Always create sleepmag.cmd so shortcuts work even after soft-continue setup.
+ */
+export function ensureSleepmagCmd(dest, opts = {}) {
+  const cmdPath = joinPath(dest, 'sleepmag.cmd');
+  if (pathExists(cmdPath)) return cmdPath;
+  if (opts.dryRun) return cmdPath;
+  const lines = [
+    '@echo off',
+    'setlocal',
+    'cd /d "%~dp0"',
+    'where node >nul 2>&1',
+    'if errorlevel 1 (',
+    '  echo Node.js not found on PATH. Re-run the Sleep Network installer.',
+    '  pause',
+    '  exit /b 1',
+    ')',
+    'node "tools\\sleepmag\\cli.mjs" %*',
+  ];
+  fs.mkdirSync(dest, { recursive: true });
+  fs.writeFileSync(cmdPath, lines.join('\r\n') + '\r\n', 'utf8');
+  if (!pathExists(cmdPath)) {
+    throw new Error(`Could not create launcher at ${cmdPath}`);
+  }
+  ok(`launcher stub: ${cmdPath}`);
+  return cmdPath;
+}
+
 function ensureWindowsShortcut(opts) {
   const info = platformInfo();
-  const desk = desktopDir(info);
-  const link = joinPath(desk, `${LAUNCHER_NAME}.lnk`);
-  const legacyLink = joinPath(desk, 'Sleep Network.lnk');
-  const targetCmd = joinPath(opts.dest, 'sleepmag.cmd');
-  const targetPs1 = joinPath(opts.dest, 'sleepmag.ps1');
-  const target = pathExists(targetCmd) ? targetCmd : pathExists(targetPs1) ? targetPs1 : null;
+  const desks = getDesktopFolders(info);
+  const primaryDesk = desks[0] || desktopDir(info);
+  const link = joinPath(primaryDesk, `${LAUNCHER_NAME}.lnk`);
+  const target = ensureSleepmagCmd(opts.dest, opts);
 
   // Prefer an icon copied into the workspace so the shortcut survives TEMP cleanup
   let icon = null;
@@ -102,48 +175,59 @@ function ensureWindowsShortcut(opts) {
     return { kind: 'lnk', path: link, target, hint };
   }
 
-  // Replace legacy shortcut name if present
-  if (pathExists(legacyLink) && !pathExists(link)) {
-    try {
-      fs.renameSync(legacyLink, link);
-    } catch {
+  if (!desks.length) {
+    say('No Desktop folder was found (checked Known Folder Desktop, OneDrive Desktop, and %USERPROFILE%\\Desktop).');
+    say(`Or run: ${target}`);
+    return { kind: 'none', path: null, target, hint: `Installed. Run ${target} to start Sleep Network.` };
+  }
+
+  const iconLine = icon ? `$sc.IconLocation = ${JSON.stringify(icon + ',0')}` : '';
+  const created = [];
+  const errors = [];
+
+  for (const desk of desks) {
+    const lnkPath = joinPath(desk, `${LAUNCHER_NAME}.lnk`);
+    const legacyLink = joinPath(desk, 'Sleep Network.lnk');
+    if (pathExists(legacyLink) && !pathExists(lnkPath)) {
       try {
-        fs.unlinkSync(legacyLink);
+        fs.renameSync(legacyLink, lnkPath);
       } catch {
-        /* ignore */
+        try {
+          fs.unlinkSync(legacyLink);
+        } catch {
+          /* ignore */
+        }
       }
     }
-  }
 
-  if (!target) {
-    say('desktop shortcut: sleepmag launcher not found yet — open the workspace folder after setup');
-    return {
-      kind: 'none',
-      path: null,
-      target: null,
-      hint: `Installed. Open ${opts.dest} and run sleepmag from there.`,
-    };
-  }
-
-  // Always (re)write so name/icon stay correct on re-run
-  const iconLine = icon
-    ? `$sc.IconLocation = ${JSON.stringify(icon + ',0')}`
-    : '';
-  const ps = `
+    const ps = `
 $ws = New-Object -ComObject WScript.Shell
-$sc = $ws.CreateShortcut(${JSON.stringify(link)})
+$sc = $ws.CreateShortcut(${JSON.stringify(lnkPath)})
 $sc.TargetPath = ${JSON.stringify(target)}
 $sc.WorkingDirectory = ${JSON.stringify(opts.dest)}
 $sc.Description = ${JSON.stringify(LAUNCHER_NAME)}
 ${iconLine}
 $sc.Save()
 `;
-  const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps]);
-  if (r.code === 0 && pathExists(link)) {
-    ok(`desktop shortcut: ${link}`);
-    return { kind: 'lnk', path: link, target, hint };
+    const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps]);
+    if (r.code === 0 && pathExists(lnkPath)) {
+      created.push(lnkPath);
+      ok(`shortcut: ${lnkPath}`);
+    } else {
+      errors.push(`${desk}: exit ${r.code}`);
+      say(`could not create shortcut on ${desk}`);
+    }
   }
-  say('could not create desktop shortcut automatically');
+
+  if (created.length) {
+    for (const lnk of created) say(`Shortcut: ${lnk}`);
+    say(`Or run: ${target}`);
+    return { kind: 'lnk', path: created[0], target, hint };
+  }
+
+  for (const e of errors) say(`shortcut error: ${e}`);
+  say('Workspace is installed, but no desktop shortcut was created');
+  say(`Or run: ${target}`);
   return {
     kind: 'none',
     path: null,

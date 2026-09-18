@@ -1,6 +1,6 @@
 /**
  * Step-scoped installer orchestration.
- * Order matches legacy install.ps1: tools → workspace → setup → assistants → launcher.
+ * Order matches current sleep-network-install: tools → workspace → assistants → setup → launcher → open.
  */
 
 import { parseEnv } from './env.js';
@@ -18,8 +18,8 @@ import { ensureLauncher, openInstalled } from './launcher.js';
 export const STEPS = [
   { id: 'tools', label: 'Install / verify tools (Git, Node, Python)' },
   { id: 'workspace', label: 'Download or update workspace' },
-  { id: 'setup', label: 'Configure Sleep Network (name, e-mail, passphrase)' },
   { id: 'assistants', label: 'Optional assistants (Claude / Codex / Gemini)' },
+  { id: 'setup', label: 'Configure Sleep Network (name, e-mail, passphrase)' },
   { id: 'launcher', label: 'Create Sleep Network Launcher shortcut' },
   { id: 'open', label: 'Open Sleep Network Launcher' },
 ];
@@ -146,6 +146,13 @@ export async function runInstall(options = {}) {
       return dest;
     });
 
+    await runStep('assistants', async () => {
+      return resolveAndInstallAssistants({
+        assistant,
+        dryRun,
+      });
+    });
+
     await runStep('setup', async () => {
       return runSleepmagSetup({
         dest: state.dest,
@@ -155,13 +162,6 @@ export async function runInstall(options = {}) {
         passphrase,
         dryRun,
         promptIfMissing: false,
-      });
-    });
-
-    await runStep('assistants', async () => {
-      return resolveAndInstallAssistants({
-        assistant,
-        dryRun,
       });
     });
 

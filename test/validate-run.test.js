@@ -71,7 +71,7 @@ describe('logger', () => {
 });
 
 describe('runInstall step order (dry-run)', () => {
-  it('emits tools → workspace → setup → assistants → launcher → open', async () => {
+  it('emits tools → workspace → assistants → setup → launcher → open', async () => {
     const seen = [];
     const logPath = path.join(os.tmpdir(), `sleepnet-order-${Date.now()}.log`);
     const logger = createLogger({ logPath });
