@@ -14,9 +14,26 @@ const resultEl = document.getElementById('result');
 const progressTitle = document.getElementById('progress-title');
 const progressTitleText = document.getElementById('progress-title-text');
 
+const statePanel = document.getElementById('state-panel');
+const stateBadge = document.getElementById('state-badge');
+const stateSummary = document.getElementById('state-summary');
+const stateChecks = document.getElementById('state-checks');
+const stateExtra = document.getElementById('state-extra');
+
+const destInput = document.getElementById('dest');
+const destChoices = document.getElementById('dest-choices');
+const destStatus = document.getElementById('dest-status');
+const allowCloudRow = document.getElementById('allow-cloud-row');
+const allowCloud = document.getElementById('allow-cloud');
+const removePreviousRow = document.getElementById('remove-previous-row');
+const removePrevious = document.getElementById('remove-previous');
+const removePreviousLabel = document.getElementById('remove-previous-label');
+
 /** @type {Map<string, HTMLLIElement>} */
 const stepNodes = new Map();
 let logPath = '';
+let inspectTimer = null;
+let lastInspect = null;
 
 async function init() {
   try {
@@ -32,6 +49,10 @@ async function init() {
       stepNodes.set(step.id, li);
     }
 
+    if (destInput && meta.defaultDest) destInput.value = meta.defaultDest;
+    renderChoices(meta.candidates || []);
+    renderState(meta);
+
     const es = new EventSource('/api/events');
     es.onmessage = (msg) => {
       try {
@@ -45,7 +66,131 @@ async function init() {
     };
   } catch (e) {
     formError.hidden = false;
-    formError.textContent = 'Could not reach the installer. Close this tab and run the installer again.';
+    formError.textContent =
+      'Could not reach the installer. Close this tab and run the installer again.';
+  }
+}
+
+/** The folder shortcuts we offer under the input. */
+function renderChoices(candidates) {
+  if (!destChoices) return;
+  destChoices.innerHTML = '';
+  for (const c of candidates) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `chip${c.cloud ? ' chip-warn' : ''}${c.recommended ? ' chip-rec' : ''}`;
+    btn.title = c.path;
+    btn.innerHTML = `<strong>${escapeHtml(c.label)}</strong><span>${escapeHtml(c.note)}</span>`;
+    btn.addEventListener('click', () => {
+      destInput.value = c.path;
+      queueInspect(0);
+    });
+    destChoices.appendChild(btn);
+  }
+}
+
+/** The "what is on this machine right now" panel. */
+function renderState(data) {
+  if (!statePanel) return;
+  const install = data.install;
+  if (!install) return;
+  statePanel.hidden = false;
+
+  const status = install.status;
+  stateBadge.className = `badge badge-${status}`;
+  stateBadge.textContent =
+    status === 'installed' ? 'Installed' : status === 'partial' ? 'Incomplete' : 'Not installed';
+  stateSummary.textContent = install.summary || '';
+
+  stateChecks.innerHTML = '';
+  for (const c of install.checks || []) {
+    const li = document.createElement('li');
+    li.className = c.ok ? 'check ok' : c.required ? 'check bad' : 'check warn';
+    li.innerHTML = `<span class="mark">${c.ok ? '✓' : c.required ? '✕' : '!'}</span>
+      <span class="label">${escapeHtml(c.label)}</span>
+      <code>${escapeHtml(c.detail || '')}</code>`;
+    stateChecks.appendChild(li);
+  }
+
+  const extra = [];
+  if (install.cloud) {
+    extra.push(
+      `<p class="warn">This folder is synced by <strong>${escapeHtml(install.cloud.label)}</strong>. That is what corrupts checkouts — pick a local folder.</p>`,
+    );
+  }
+  for (const o of data.others || []) {
+    extra.push(
+      `<p class="warn">Another install: <code>${escapeHtml(o.dest)}</code> (${escapeHtml(o.status)})</p>`,
+    );
+  }
+  const shortcuts = data.shortcuts || [];
+  if (shortcuts.length) {
+    extra.push(
+      `<p>Shortcuts found:</p><ul class="paths">${shortcuts
+        .map(
+          (s) =>
+            `<li><code>${escapeHtml(s.path)}</code>${
+              s.target ? ` → <code>${escapeHtml(s.target)}</code>` : ''
+            }${s.dead ? ' <em>(target missing)</em>' : ''}</li>`,
+        )
+        .join('')}</ul>`,
+    );
+  } else {
+    extra.push('<p>No Sleep Network shortcut found on this machine.</p>');
+  }
+  stateExtra.innerHTML = extra.join('');
+
+  // Offer the cleanup only when there is something to clean.
+  const removable = (data.others || []).length;
+  const deadShortcuts = shortcuts.filter((s) => s.dead).length;
+  if (removePreviousRow) {
+    if (removable || deadShortcuts) {
+      removePreviousRow.hidden = false;
+      removePreviousLabel.textContent = removable
+        ? `Delete the other install${removable > 1 ? 's' : ''} and its shortcuts`
+        : 'Delete the dead shortcuts';
+      if (removable) removePrevious.checked = true;
+    } else {
+      removePreviousRow.hidden = true;
+      removePrevious.checked = false;
+    }
+  }
+}
+
+/** Ask the server about the typed folder, debounced. */
+function queueInspect(delay = 400) {
+  if (inspectTimer) clearTimeout(inspectTimer);
+  inspectTimer = setTimeout(runInspect, delay);
+}
+
+async function runInspect() {
+  if (!destInput) return;
+  const dest = destInput.value.trim();
+  if (!dest) return;
+  try {
+    const data = await fetch('/api/inspect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dest, allowCloud: Boolean(allowCloud?.checked) }),
+    }).then((r) => r.json());
+    lastInspect = data;
+
+    destStatus.hidden = false;
+    if (data.errors?.length) {
+      destStatus.className = 'dest-status bad';
+      destStatus.textContent = data.errors.join(' ');
+    } else if (data.warnings?.length) {
+      destStatus.className = 'dest-status warn';
+      destStatus.textContent = data.warnings.join(' ');
+    } else {
+      destStatus.className = 'dest-status ok';
+      destStatus.textContent = `Will install into ${data.dest}`;
+    }
+
+    if (allowCloudRow) allowCloudRow.hidden = !data.cloud;
+    renderState(data);
+  } catch {
+    /* leave the last good state on screen */
   }
 }
 
@@ -117,17 +262,63 @@ function showResult(kind, ev) {
   progressTitleText.textContent = kind === 'ok' ? 'Ready' : 'Something went wrong';
   resultEl.hidden = false;
   resultEl.className = `result ${kind}`;
+
   if (kind === 'ok') {
-    const dest = ev.result?.dest || '';
-    const opened = ev.result?.opened || ev.opened;
-    resultEl.innerHTML = `<h3>You're set</h3>
-      <p>${
-        opened
-          ? '<strong>Sleep Network Launcher</strong> is opening now.'
-          : 'Open <strong>Sleep Network Launcher</strong> on your desktop.'
-      }</p>
-      ${dest ? `<p>Workspace: <code>${escapeHtml(dest)}</code></p>` : ''}
-      <p>You can close this tab.</p>`;
+    const r = ev.result || ev || {};
+    const dest = r.dest || '';
+    const opened = Boolean(r.opened);
+    const parts = [`<h3>You're set</h3>`];
+
+    parts.push(
+      opened
+        ? '<p><strong>Sleep Network Launcher</strong> is opening now.</p>'
+        : `<p><strong>The launcher did not open by itself.</strong>${
+            r.openEvidence ? ` <span class="muted">(${escapeHtml(r.openEvidence)})</span>` : ''
+          }</p><p>${escapeHtml(r.howTo || 'Double-click Sleep Network Launcher on your desktop.')}</p>`,
+    );
+
+    const rows = [];
+    if (dest) rows.push(['Workspace', dest]);
+    if (r.shortcut) rows.push(['Shortcut', r.shortcut]);
+    if (r.target) rows.push(['Starts', r.target]);
+    if (r.icon) rows.push(['Icon', r.icon]);
+    if (rows.length) {
+      parts.push(
+        `<table class="paths-table">${rows
+          .map(
+            ([k, v]) =>
+              `<tr><th>${escapeHtml(k)}</th><td><code>${escapeHtml(v)}</code></td></tr>`,
+          )
+          .join('')}</table>`,
+      );
+    }
+
+    const removed = [...(r.removed || []), ...(r.shortcutsRemoved || [])];
+    if (removed.length) {
+      parts.push(
+        `<p>Removed from the previous install:</p><ul class="paths">${removed
+          .map((p) => `<li><code>${escapeHtml(p)}</code></li>`)
+          .join('')}</ul>`,
+      );
+    }
+
+    if ((r.checks || []).length) {
+      parts.push(
+        `<details class="verify"><summary>What was verified</summary><ul class="checks">${r.checks
+          .map(
+            (c) =>
+              `<li class="check ${c.ok ? 'ok' : 'bad'}"><span class="mark">${
+                c.ok ? '✓' : '✕'
+              }</span><span class="label">${escapeHtml(c.label)}</span><code>${escapeHtml(
+                c.detail || '',
+              )}</code></li>`,
+          )
+          .join('')}</ul></details>`,
+      );
+    }
+
+    parts.push('<p>You can close this tab.</p>');
+    resultEl.innerHTML = parts.join('');
   } else {
     const err = ev.error || {};
     const step = err.stepLabel || err.step || 'unknown step';
@@ -150,7 +341,11 @@ form.addEventListener('submit', async (e) => {
     name: /** @type {HTMLInputElement} */ (document.getElementById('name')).value,
     email: /** @type {HTMLInputElement} */ (document.getElementById('email')).value,
     passphrase: /** @type {HTMLInputElement} */ (document.getElementById('passphrase')).value,
-    assistant: /** @type {HTMLSelectElement} */ (document.getElementById('assistant')).value || 'none',
+    assistant:
+      /** @type {HTMLSelectElement} */ (document.getElementById('assistant')).value || 'none',
+    dest: destInput ? destInput.value.trim() : '',
+    allowCloud: Boolean(allowCloud?.checked),
+    removePrevious: Boolean(removePrevious?.checked && !removePreviousRow.hidden),
   };
 
   setBusy(true);
@@ -169,6 +364,7 @@ form.addEventListener('submit', async (e) => {
     }
 
     formPanel.hidden = true;
+    if (statePanel) statePanel.hidden = true;
     progressPanel.hidden = false;
     progressTitle.classList.remove('is-done', 'is-failed');
     progressTitleText.textContent = 'Working…';
@@ -183,6 +379,12 @@ form.addEventListener('submit', async (e) => {
     formError.textContent = 'Could not start. Close this tab and run the installer again.';
   }
 });
+
+if (destInput) {
+  destInput.addEventListener('input', () => queueInspect());
+  destInput.addEventListener('blur', () => queueInspect(0));
+}
+if (allowCloud) allowCloud.addEventListener('change', () => queueInspect(0));
 
 copyBtn.addEventListener('click', async (e) => {
   e.preventDefault();

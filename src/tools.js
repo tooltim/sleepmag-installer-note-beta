@@ -216,12 +216,41 @@ function download(url, dest) {
 /**
  * Check-mode report lines (pure-ish for tests).
  */
-export function checkReport({ have, workspacePresent }) {
+/**
+ * @param {{
+ *   have: Record<string, boolean>,
+ *   workspacePresent: boolean,
+ *   install?: import('./inspect.js').inspectInstall extends never ? any : any,
+ *   others?: Array<{ dest: string, status: string }>,
+ *   shortcuts?: Array<{ path: string, target?: string, dead?: boolean }>,
+ * }} args
+ * @returns {string[]}
+ */
+export function checkReport({ have, workspacePresent, install, others, shortcuts }) {
   const lines = [];
   for (const c of ['git', 'node', 'claude', 'codex', 'gemini', 'python']) {
     lines.push(have[c] ? `OK  ${c} found` : `${c} missing`);
   }
   lines.push(`workspace: ${workspacePresent ? 'present' : 'not installed'}`);
+
+  // Everything below is the detail the old one-word answer never gave.
+  if (install) {
+    lines.push(install.status === 'installed' ? `OK  ${install.summary}` : install.summary);
+    for (const c of install.checks || []) {
+      lines.push(c.ok ? `OK  ${c.label}: ${c.detail}` : `${c.label}: ${c.detail}`);
+    }
+    if (install.cloud) {
+      lines.push(`warning: this folder is synced by ${install.cloud.label}`);
+    }
+  }
+  for (const other of others || []) {
+    lines.push(`another install: ${other.dest} (${other.status})`);
+  }
+  for (const s of shortcuts || []) {
+    lines.push(
+      `shortcut: ${s.path}${s.target ? ` -> ${s.target}` : ''}${s.dead ? ' (TARGET MISSING)' : ''}`,
+    );
+  }
   return lines;
 }
 

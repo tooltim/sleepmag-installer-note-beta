@@ -13,6 +13,10 @@ import { runInstall } from '../runInstall.js';
 import { STEPS } from '../runInstall.js';
 import { validateInstallInputs } from '../validate.js';
 import { setMessenger } from '../say.js';
+import { resolveDocumentsDir } from '../paths.js';
+import { validateDestination, destinationCandidates } from '../destination.js';
+import { inspectInstall, findInstalls } from '../inspect.js';
+import { findShortcuts } from '../cleanup.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(__dirname, 'public');
@@ -82,10 +86,35 @@ export async function startUiServer(opts = {}) {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/meta') {
+      const documentsDir = safeDocuments(env);
+      const suggested = validateDestination(null, { env, documentsDir, probe: false }).dest;
       return json(res, {
         steps: STEPS,
         logPath: logger.logPath,
         status: installState.status,
+        defaultDest: suggested,
+        candidates: destinationCandidates({ env, documentsDir }),
+        ...currentState(suggested),
+      });
+    }
+
+    // Live feedback while the user types a folder: is it usable, what is there now.
+    if (req.method === 'POST' && url.pathname === '/api/inspect') {
+      const body = await readJson(req);
+      const documentsDir = safeDocuments(env);
+      const check = validateDestination(body.dest || null, {
+        env,
+        documentsDir,
+        allowCloud: Boolean(body.allowCloud),
+        probe: true,
+      });
+      return json(res, {
+        ok: check.ok,
+        dest: check.dest,
+        cloud: check.cloud,
+        errors: check.errors,
+        warnings: check.warnings,
+        ...currentState(check.dest),
       });
     }
 
@@ -135,6 +164,15 @@ export async function startUiServer(opts = {}) {
       if (!validated.ok) {
         return json(res, { ok: false, errors: validated.errors }, 400);
       }
+      const destCheck = validateDestination(body.dest || null, {
+        env,
+        documentsDir: safeDocuments(env),
+        allowCloud: Boolean(body.allowCloud),
+        probe: true,
+      });
+      if (!destCheck.ok) {
+        return json(res, { ok: false, errors: destCheck.errors }, 400);
+      }
 
       installRunning = true;
       installState = { status: 'running' };
@@ -161,6 +199,9 @@ export async function startUiServer(opts = {}) {
               email: validated.email,
               passphrase: validated.passphrase,
               assistant: validated.assistant,
+              dest: destCheck.dest,
+              allowCloud: Boolean(body.allowCloud),
+              removePrevious: Boolean(body.removePrevious),
               promptIfMissing: false,
               logger,
             });
@@ -173,6 +214,19 @@ export async function startUiServer(opts = {}) {
                 hint: result.launcher?.hint,
                 logPath: result.logPath,
                 opened: Boolean(result.opened),
+                openEvidence: result.open?.evidence || '',
+                howTo: result.open?.howTo || '',
+                shortcut: result.launcher?.path || '',
+                shortcuts: result.launcher?.shortcuts || [],
+                target: result.launcher?.target || '',
+                icon: result.launcher?.icon?.path || '',
+                removed: result.cleanup?.workspacesRemoved || [],
+                shortcutsRemoved: result.cleanup?.shortcutsRemoved || [],
+                checks: (result.verify?.checks || []).map((c) => ({
+                  label: c.label,
+                  ok: c.ok,
+                  detail: c.detail,
+                })),
               },
               ts: new Date().toISOString(),
             });
@@ -201,6 +255,41 @@ export async function startUiServer(opts = {}) {
 
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not found');
+  }
+
+  /** What is installed right now, for the folder the user is looking at. */
+  function currentState(dest) {
+    const install = inspectInstall(dest, { env });
+    const others = findInstalls({ env }).filter(
+      (i) => i.dest.toLowerCase() !== String(dest).toLowerCase(),
+    );
+    const shortcuts = findShortcuts({ env });
+    return {
+      install: {
+        dest: install.dest,
+        status: install.status,
+        summary: install.summary,
+        problems: install.problems,
+        cloud: install.cloud,
+        git: install.git,
+        checks: install.checks.map((c) => ({
+          label: c.label,
+          ok: c.ok,
+          detail: c.detail,
+          required: c.required,
+        })),
+      },
+      others: others.map((o) => ({ dest: o.dest, status: o.status, summary: o.summary })),
+      shortcuts: shortcuts.map((s) => ({ path: s.path, target: s.target, dead: s.dead })),
+    };
+  }
+
+  function safeDocuments(e) {
+    try {
+      return resolveDocumentsDir({ env: e });
+    } catch {
+      return null;
+    }
   }
 
   const port = opts.port || 0;

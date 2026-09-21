@@ -1,6 +1,11 @@
 /**
- * Desktop launcher / shortcut where the OS allows.
- * sleepmag setup usually creates one; we ensure a fallback exists.
+ * Desktop launcher / shortcut, and opening it afterwards.
+ *
+ * Two things this file is strict about, because both used to fail silently:
+ *   - the ICON: we resolve a real .ico that lives inside the workspace (so it
+ *     survives TEMP cleanup), set it, then read the shortcut back to confirm.
+ *   - OPENING: we do not print "opening now" unless a process actually started
+ *     and was still alive a moment later.
  */
 
 import fs from 'node:fs';
@@ -10,15 +15,54 @@ import { spawn } from 'node:child_process';
 import { joinPath, pathExists, platformInfo } from './platform.js';
 import { run } from './exec.js';
 import { say, ok } from './say.js';
+import { desktopFolders, removeShortcuts, findShortcuts } from './cleanup.js';
 
 const LAUNCHER_NAME = 'Sleep Network Launcher';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ICON_ICO = path.join(__dirname, '..', 'assets', 'sleepmag-logo.ico');
 const ICON_PNG = path.join(__dirname, '..', 'assets', 'sleepmag-icon.png');
+/** The workspace ships its own icon; preferring it means the .lnk never points into TEMP. */
+const WORKSPACE_ICON_NAME = 'Sleep Network Launcher.ico';
+/** The workspace's own launcher: opens the browser UI. sleepmag.cmd is only the bare CLI. */
+const WORKSPACE_LAUNCHER_CMD = 'Sleep Network Launcher.cmd';
+const LAUNCHER_ENTRY = ['tools', 'sleepmag', 'launcher', 'run.mjs'];
 
 /**
+ * What the desktop icon should start.
+ *
+ * The workspace ships "Sleep Network Launcher.cmd", which opens the launcher
+ * window. Pointing the shortcut at sleepmag.cmd instead only dumps CLI help,
+ * which is what made the icon look broken even when it worked.
+ *
  * @param {{ dest: string, dryRun?: boolean }} opts
- * @returns {{ kind: string, path: string|null, hint: string, target?: string|null }}
+ * @returns {string}
+ */
+export function resolveLauncherTarget(opts) {
+  const shipped = joinPath(opts.dest, WORKSPACE_LAUNCHER_CMD);
+  if (pathExists(shipped)) {
+    try {
+      if (fs.statSync(shipped).size > 20) return shipped;
+    } catch {
+      /* fall through to the stub */
+    }
+  }
+  say(`${shipped} not found — falling back to sleepmag.cmd`);
+  return ensureSleepmagCmd(opts.dest, opts);
+}
+
+/**
+ * The posix equivalent: the launcher entry point, or the CLI if it is missing.
+ * @param {string} dest
+ */
+export function resolvePosixEntry(dest) {
+  const launcher = joinPath(dest, ...LAUNCHER_ENTRY);
+  if (pathExists(launcher)) return launcher;
+  return joinPath(dest, 'tools', 'sleepmag', 'cli.mjs');
+}
+
+/**
+ * @param {{ dest: string, dryRun?: boolean, replaceExisting?: boolean }} opts
+ * @returns {{ kind: string, path: string|null, hint: string, target?: string|null, icon?: object, shortcuts?: string[] }}
  */
 export function ensureLauncher(opts) {
   const info = platformInfo();
@@ -28,95 +72,92 @@ export function ensureLauncher(opts) {
 }
 
 /**
- * Open the installed launcher (or workspace target) after a successful install.
- * @param {{ path?: string|null, target?: string|null, kind?: string }} launcher
- * @param {{ dryRun?: boolean }} [opts]
+ * Find an icon file that will still exist tomorrow, and report honestly when
+ * there is none. Order: the workspace's own .ico, then a copy of ours placed
+ * inside the workspace, then (last resort) the installer's own asset.
+ *
+ * @param {{ dest: string, dryRun?: boolean }} opts
+ * @returns {{ path: string|null, source: string, ok: boolean, error?: string }}
  */
-export function openInstalled(launcher, opts = {}) {
-  if (opts.dryRun) {
-    say('[dry-run] would open Sleep Network Launcher');
-    return false;
+export function resolveIcon(opts) {
+  const shipped = joinPath(opts.dest, WORKSPACE_ICON_NAME);
+  if (isUsableIcon(shipped)) {
+    return { path: shipped, source: 'workspace', ok: true };
   }
-  const openPath = launcher?.path || launcher?.target;
-  if (!openPath || !pathExists(openPath)) {
-    say('could not open launcher automatically (shortcut missing)');
-    return false;
+
+  if (!isUsableIcon(ICON_ICO)) {
+    return {
+      path: null,
+      source: 'none',
+      ok: false,
+      error: `no icon file available (looked for ${shipped} and ${ICON_ICO})`,
+    };
   }
+
+  if (opts.dryRun) return { path: shipped, source: 'copy', ok: true };
+
   try {
-    if (process.platform === 'win32') {
-      spawn('cmd', ['/c', 'start', '', openPath], {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: true,
-      }).unref();
-    } else if (process.platform === 'darwin') {
-      spawn('open', [openPath], { detached: true, stdio: 'ignore' }).unref();
-    } else {
-      spawn('xdg-open', [openPath], { detached: true, stdio: 'ignore' }).unref();
-    }
-    ok(`opened ${LAUNCHER_NAME}`);
-    return true;
+    fs.mkdirSync(opts.dest, { recursive: true });
+    fs.copyFileSync(ICON_ICO, shipped);
   } catch (e) {
-    say(`could not open launcher: ${e.message || e}`);
+    return {
+      path: ICON_ICO,
+      source: 'installer',
+      ok: true,
+      error: `could not copy the icon into the workspace (${e.message || e}); using ${ICON_ICO}, which may be cleaned up later`,
+    };
+  }
+
+  if (!isUsableIcon(shipped)) {
+    return {
+      path: ICON_ICO,
+      source: 'installer',
+      ok: true,
+      error: `icon copy at ${shipped} is empty; using ${ICON_ICO}`,
+    };
+  }
+  return { path: shipped, source: 'copy', ok: true };
+}
+
+/** A zero-byte .ico is why a shortcut shows the blank-page icon. */
+export function isUsableIcon(p) {
+  if (!p || !pathExists(p)) return false;
+  try {
+    return fs.statSync(p).size > 100;
+  } catch {
     return false;
   }
 }
 
-function desktopDir(info) {
-  const home = info.home;
-  if (info.isWin) {
-    return process.env.USERPROFILE
-      ? joinPath(process.env.USERPROFILE, 'Desktop')
-      : joinPath(home, 'Desktop');
-  }
-  return joinPath(home, 'Desktop');
+/**
+ * Read a .lnk back and say what it really points at.
+ * @param {string} lnkPath
+ * @returns {{ ok: boolean, target: string, icon: string, error?: string }}
+ */
+export function readShortcut(lnkPath) {
+  const ps = `
+$ws = New-Object -ComObject WScript.Shell
+$sc = $ws.CreateShortcut(${JSON.stringify(lnkPath)})
+Write-Output ("TARGET=" + $sc.TargetPath)
+Write-Output ("ICON=" + $sc.IconLocation)
+`;
+  const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], {
+    timeout: 20_000,
+  });
+  if (r.code !== 0) return { ok: false, target: '', icon: '', error: `exit ${r.code}` };
+  const text = String(r.stdout || '');
+  const target = (text.match(/TARGET=(.*)/) || [])[1]?.trim() || '';
+  const icon = (text.match(/ICON=(.*)/) || [])[1]?.trim() || '';
+  return { ok: true, target, icon };
 }
 
-function getDesktopFolders(info) {
-  const dirs = [];
-  const add = (p) => {
-    if (!p || !pathExists(p)) return;
-    try {
-      const real = fs.realpathSync(p);
-      if (!dirs.includes(real)) dirs.push(real);
-    } catch {
-      if (!dirs.includes(p)) dirs.push(p);
-    }
-  };
-
-  if (info.isWin) {
-    const fromPs = run(
-      'powershell.exe',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        "[Environment]::GetFolderPath('Desktop'); [Environment]::GetFolderPath('CommonDesktopDirectory')",
-      ],
-      { timeout: 10_000 },
-    );
-    for (const line of String(fromPs.stdout || '')
-      .split(/\r?\n/)
-      .map((s) => s.trim())
-      .filter(Boolean)) {
-      add(line);
-    }
-    for (const root of [
-      process.env.OneDrive,
-      process.env.OneDriveConsumer,
-      process.env.OneDriveCommercial,
-    ].filter(Boolean)) {
-      add(joinPath(root, 'Desktop'));
-    }
-    add(
-      process.env.USERPROFILE
-        ? joinPath(process.env.USERPROFILE, 'Desktop')
-        : joinPath(info.home, 'Desktop'),
-    );
-  } else {
-    add(joinPath(info.home, 'Desktop'));
-  }
-  return dirs;
+/**
+ * Windows caches shortcut icons; a fresh profile often shows the generic one
+ * until the cache is poked. Best effort, never fatal.
+ */
+function refreshIconCache() {
+  run('ie4uinit.exe', ['-show'], { timeout: 15_000 });
+  run('ie4uinit.exe', ['-ClearIconCache'], { timeout: 15_000 });
 }
 
 /**
@@ -124,7 +165,16 @@ function getDesktopFolders(info) {
  */
 export function ensureSleepmagCmd(dest, opts = {}) {
   const cmdPath = joinPath(dest, 'sleepmag.cmd');
-  if (pathExists(cmdPath)) return cmdPath;
+  if (pathExists(cmdPath)) {
+    let size = 0;
+    try {
+      size = fs.statSync(cmdPath).size;
+    } catch {
+      size = 0;
+    }
+    if (size > 20) return cmdPath;
+    say(`${cmdPath} was empty — rewriting it`);
+  }
   if (opts.dryRun) return cmdPath;
   const lines = [
     '@echo off',
@@ -147,59 +197,65 @@ export function ensureSleepmagCmd(dest, opts = {}) {
   return cmdPath;
 }
 
+function desktopDir(info) {
+  const home = info.home;
+  if (info.isWin) {
+    return process.env.USERPROFILE
+      ? joinPath(process.env.USERPROFILE, 'Desktop')
+      : joinPath(home, 'Desktop');
+  }
+  return joinPath(home, 'Desktop');
+}
+
 function ensureWindowsShortcut(opts) {
   const info = platformInfo();
-  const desks = getDesktopFolders(info);
-  const primaryDesk = desks[0] || desktopDir(info);
-  const link = joinPath(primaryDesk, `${LAUNCHER_NAME}.lnk`);
-  const target = ensureSleepmagCmd(opts.dest, opts);
-
-  // Prefer an icon copied into the workspace so the shortcut survives TEMP cleanup
-  let icon = null;
-  if (pathExists(ICON_ICO)) {
-    try {
-      const destIcon = joinPath(opts.dest, 'Sleep Network Launcher.ico');
-      if (!opts.dryRun) {
-        fs.mkdirSync(opts.dest, { recursive: true });
-        fs.copyFileSync(ICON_ICO, destIcon);
-      }
-      icon = destIcon;
-    } catch {
-      icon = ICON_ICO;
-    }
-  }
+  const desks = desktopFolders();
+  // Always leave sleepmag.cmd behind (PATH / scripts rely on it), but point the
+  // icon at the launcher window.
+  ensureSleepmagCmd(opts.dest, opts);
+  const target = resolveLauncherTarget(opts);
+  const icon = resolveIcon(opts);
+  if (icon.error) say(`icon: ${icon.error}`);
 
   const hint = `Installed. Double-click '${LAUNCHER_NAME}' on your desktop.`;
 
   if (opts.dryRun) {
-    return { kind: 'lnk', path: link, target, hint };
+    const link = joinPath(desks[0] || desktopDir(info), `${LAUNCHER_NAME}.lnk`);
+    return { kind: 'lnk', path: link, target, hint, icon, shortcuts: [link] };
   }
 
   if (!desks.length) {
-    say('No Desktop folder was found (checked Known Folder Desktop, OneDrive Desktop, and %USERPROFILE%\\Desktop).');
+    say(
+      'No Desktop folder was found (checked Known Folder Desktop, OneDrive Desktop, and %USERPROFILE%\\Desktop).',
+    );
     say(`Or run: ${target}`);
-    return { kind: 'none', path: null, target, hint: `Installed. Run ${target} to start Sleep Network.` };
+    return {
+      kind: 'none',
+      path: null,
+      target,
+      icon,
+      shortcuts: [],
+      hint: `Installed. Run ${target} to start Sleep Network.`,
+    };
   }
 
-  const iconLine = icon ? `$sc.IconLocation = ${JSON.stringify(icon + ',0')}` : '';
+  // Any shortcut of ours still lying around points at the old install: drop it.
+  if (opts.replaceExisting !== false) {
+    const stale = findShortcuts({ withTargets: true }).filter(
+      (s) => s.path.toLowerCase().endsWith('.lnk'),
+    );
+    if (stale.length) {
+      const r = removeShortcuts(stale);
+      for (const p of r.removed) say(`replaced old shortcut: ${p}`);
+    }
+  }
+
   const created = [];
   const errors = [];
 
   for (const desk of desks) {
     const lnkPath = joinPath(desk, `${LAUNCHER_NAME}.lnk`);
-    const legacyLink = joinPath(desk, 'Sleep Network.lnk');
-    if (pathExists(legacyLink) && !pathExists(lnkPath)) {
-      try {
-        fs.renameSync(legacyLink, lnkPath);
-      } catch {
-        try {
-          fs.unlinkSync(legacyLink);
-        } catch {
-          /* ignore */
-        }
-      }
-    }
-
+    const iconLine = icon.path ? `$sc.IconLocation = ${JSON.stringify(icon.path + ',0')}` : '';
     const ps = `
 $ws = New-Object -ComObject WScript.Shell
 $sc = $ws.CreateShortcut(${JSON.stringify(lnkPath)})
@@ -211,8 +267,15 @@ $sc.Save()
 `;
     const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps]);
     if (r.code === 0 && pathExists(lnkPath)) {
+      const back = readShortcut(lnkPath);
+      if (back.ok && icon.path && !back.icon) {
+        say(`shortcut created but Windows did not keep the icon: ${lnkPath}`);
+      } else if (back.ok && icon.path) {
+        ok(`shortcut: ${lnkPath} (icon: ${icon.path})`);
+      } else {
+        ok(`shortcut: ${lnkPath}`);
+      }
       created.push(lnkPath);
-      ok(`shortcut: ${lnkPath}`);
     } else {
       errors.push(`${desk}: exit ${r.code}`);
       say(`could not create shortcut on ${desk}`);
@@ -220,9 +283,10 @@ $sc.Save()
   }
 
   if (created.length) {
+    refreshIconCache();
     for (const lnk of created) say(`Shortcut: ${lnk}`);
     say(`Or run: ${target}`);
-    return { kind: 'lnk', path: created[0], target, hint };
+    return { kind: 'lnk', path: created[0], target, hint, icon, shortcuts: created };
   }
 
   for (const e of errors) say(`shortcut error: ${e}`);
@@ -232,23 +296,116 @@ $sc.Save()
     kind: 'none',
     path: null,
     target,
+    icon,
+    shortcuts: [],
     hint: `Installed. Run ${target} to start Sleep Network.`,
   };
+}
+
+/**
+ * Open the installed launcher and PROVE it started.
+ *
+ * Windows: Start-Process -PassThru, then check the process is still alive.
+ * macOS/Linux: the opener's exit code.
+ *
+ * @param {{ path?: string|null, target?: string|null, kind?: string }} launcher
+ * @param {{ dryRun?: boolean, dest?: string, waitMs?: number }} [opts]
+ * @returns {{ opened: boolean, evidence: string, openedPath?: string, howTo: string }}
+ */
+export function openInstalled(launcher, opts = {}) {
+  const fallbackPath = launcher?.target || launcher?.path || '';
+  const howTo = fallbackPath
+    ? `Double-click '${LAUNCHER_NAME}' on your desktop, or run ${fallbackPath}`
+    : `Double-click '${LAUNCHER_NAME}' on your desktop`;
+
+  if (opts.dryRun) {
+    say('[dry-run] would open Sleep Network Launcher');
+    return { opened: false, evidence: 'dry-run', howTo };
+  }
+
+  // Prefer the shortcut (it proves the shortcut itself works); fall back to the stub.
+  const candidates = [launcher?.path, launcher?.target].filter(
+    (p) => p && pathExists(p),
+  );
+  if (!candidates.length) {
+    say('could not open the launcher automatically: nothing to open');
+    return { opened: false, evidence: 'no launcher file on disk', howTo };
+  }
+
+  for (const openPath of candidates) {
+    const res = launchAndVerify(openPath, opts);
+    if (res.opened) {
+      ok(`opened ${LAUNCHER_NAME} (${res.evidence})`);
+      return { ...res, openedPath: openPath, howTo };
+    }
+    say(`could not start ${openPath}: ${res.evidence}`);
+  }
+
+  return { opened: false, evidence: 'every launch attempt failed', howTo };
+}
+
+/**
+ * Start one file and wait long enough to know whether it survived.
+ * @param {string} openPath
+ * @param {{ dest?: string, waitMs?: number }} opts
+ * @returns {{ opened: boolean, evidence: string }}
+ */
+function launchAndVerify(openPath, opts = {}) {
+  const waitMs = opts.waitMs ?? 2500;
+
+  if (process.platform === 'win32') {
+    const workDir = opts.dest || path.dirname(openPath);
+    const ps = `
+$ErrorActionPreference = 'Stop'
+try {
+  $p = Start-Process -FilePath ${JSON.stringify(openPath)} -WorkingDirectory ${JSON.stringify(workDir)} -PassThru
+} catch {
+  Write-Output ("FAILED=" + $_.Exception.Message)
+  exit 0
+}
+if (-not $p) { Write-Output 'FAILED=no process returned'; exit 0 }
+Start-Sleep -Milliseconds ${Math.max(300, waitMs)}
+if ($p.HasExited) { Write-Output ("EXITED=" + $p.ExitCode) } else { Write-Output ("ALIVE=" + $p.Id) }
+`;
+    const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], {
+      timeout: Math.max(30_000, waitMs + 20_000),
+    });
+    const out = String(r.stdout || '').trim();
+    const alive = out.match(/ALIVE=(\d+)/);
+    if (alive) return { opened: true, evidence: `process ${alive[1]} running` };
+    const exited = out.match(/EXITED=(-?\d+)/);
+    if (exited) {
+      // A launcher that exits instantly did not really open for the user.
+      return exited[1] === '0'
+        ? { opened: true, evidence: 'process finished immediately with success' }
+        : { opened: false, evidence: `process exited with code ${exited[1]}` };
+    }
+    const failed = out.match(/FAILED=(.*)/);
+    return { opened: false, evidence: failed ? failed[1] : `powershell exit ${r.code}` };
+  }
+
+  const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open';
+  try {
+    const r = run(cmd, [openPath], { timeout: 20_000 });
+    if (r.code === 0) return { opened: true, evidence: `${cmd} accepted it` };
+    return { opened: false, evidence: `${cmd} exit ${r.code}` };
+  } catch (e) {
+    return { opened: false, evidence: e.message || String(e) };
+  }
 }
 
 function ensureMacLauncher(opts) {
   const info = platformInfo();
   const desktop = desktopDir(info);
   const commandPath = joinPath(desktop, `${LAUNCHER_NAME}.command`);
-  const legacyPath = joinPath(desktop, 'Sleep Network.command');
-  const cli = joinPath(opts.dest, 'tools', 'sleepmag', 'cli.mjs');
+  const cli = resolvePosixEntry(opts.dest);
 
   const script = `#!/bin/bash
 cd ${shellQuote(opts.dest)} || exit 1
-if [[ -x ./sleepmag ]]; then
-  exec ./sleepmag "$@"
-elif [[ -f ${shellQuote(cli)} ]]; then
+if [[ -f ${shellQuote(cli)} ]]; then
   exec node ${shellQuote(cli)} "$@"
+elif [[ -x ./sleepmag ]]; then
+  exec ./sleepmag "$@"
 else
   echo "Sleep Network Launcher not found in ${opts.dest}"
   read -r -p "Press Enter to close…"
@@ -259,22 +416,22 @@ fi
   const hint = `Installed. Double-click '${LAUNCHER_NAME}.command' on your Desktop (right-click → Open the first time if macOS blocks it).`;
 
   if (opts.dryRun) {
-    return { kind: 'command', path: commandPath, target: cli, hint };
+    return { kind: 'command', path: commandPath, target: cli, hint, shortcuts: [commandPath] };
+  }
+
+  if (opts.replaceExisting !== false) {
+    const stale = findShortcuts({ withTargets: false }).filter((s) =>
+      s.path.toLowerCase().endsWith('.command'),
+    );
+    const r = removeShortcuts(stale);
+    for (const p of r.removed) say(`replaced old launcher: ${p}`);
   }
 
   try {
     fs.mkdirSync(desktop, { recursive: true });
-    if (pathExists(legacyPath) && !pathExists(commandPath)) {
-      try {
-        fs.renameSync(legacyPath, commandPath);
-      } catch {
-        /* ignore */
-      }
-    }
     fs.writeFileSync(commandPath, script, { encoding: 'utf8', mode: 0o755 });
     fs.chmodSync(commandPath, 0o755);
     run('xattr', ['-d', 'com.apple.quarantine', commandPath], { timeout: 5_000 });
-    // Best-effort custom icon via PNG (macOS file icon); ignore failures
     if (pathExists(ICON_PNG)) {
       trySetMacIcon(commandPath, ICON_PNG);
     }
@@ -288,19 +445,17 @@ fi
     path: pathExists(commandPath) ? commandPath : null,
     target: cli,
     hint,
+    shortcuts: pathExists(commandPath) ? [commandPath] : [],
   };
 }
 
 function trySetMacIcon(filePath, pngPath) {
-  // Uses sips + AppleScript file icon; soft-fail on locked-down Macs
   const tmpIcns = joinPath(platformInfo().temp, 'sleepnet-launcher.icns');
   const tmpIconset = joinPath(platformInfo().temp, 'sleepnet-launcher.iconset');
   run('mkdir', ['-p', tmpIconset], { timeout: 5_000 });
-  run(
-    'sips',
-    ['-z', '128', '128', pngPath, '--out', joinPath(tmpIconset, 'icon_128x128.png')],
-    { timeout: 15_000 },
-  );
+  run('sips', ['-z', '128', '128', pngPath, '--out', joinPath(tmpIconset, 'icon_128x128.png')], {
+    timeout: 15_000,
+  });
   run('iconutil', ['-c', 'icns', tmpIconset, '-o', tmpIcns], { timeout: 15_000 });
   if (!pathExists(tmpIcns)) return;
   const as = `
@@ -315,7 +470,7 @@ function ensureLinuxDesktopEntry(opts) {
   const info = platformInfo();
   const apps = joinPath(info.home, '.local', 'share', 'applications');
   const desktopFile = joinPath(apps, 'sleep-network-launcher.desktop');
-  const cli = joinPath(opts.dest, 'tools', 'sleepmag', 'cli.mjs');
+  const cli = resolvePosixEntry(opts.dest);
   const iconLine = pathExists(ICON_PNG) ? `Icon=${ICON_PNG}` : '';
   const body = `[Desktop Entry]
 Type=Application
@@ -333,6 +488,7 @@ ${iconLine}
       kind: 'desktop',
       path: desktopFile,
       target: cli,
+      shortcuts: [desktopFile],
       hint: `Installed. Launch via ${desktopFile} or: node ${cli}`,
     };
   }
@@ -353,6 +509,7 @@ ${iconLine}
     kind: 'desktop',
     path: desktopFile,
     target: cli,
+    shortcuts: [desktopFile],
     hint: `Installed. Run: node ${cli}   (or use the ${LAUNCHER_NAME} app entry if your desktop picked it up)`,
   };
 }
@@ -383,4 +540,4 @@ export function doneLooksLike(platform = process.platform) {
   };
 }
 
-export { LAUNCHER_NAME };
+export { LAUNCHER_NAME, WORKSPACE_ICON_NAME };

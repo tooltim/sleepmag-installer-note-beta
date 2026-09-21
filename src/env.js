@@ -4,6 +4,9 @@
  * SLEEPNET_MODE=check           — report only, no installs
  * SLEEPNET_NAME / EMAIL / PASSPHRASE — skip prompts
  * SLEEPNET_ASSISTANT=claude|codex|gemini|both|all|none
+ * SLEEPNET_DEST=<folder>        — where to install (default: a local folder)
+ * SLEEPNET_ALLOW_CLOUD=1        — allow OneDrive/iCloud/Dropbox anyway
+ * SLEEPNET_REMOVE_PREVIOUS=1    — delete workspaces found elsewhere
  * SLEEPNET_DRY_RUN=1            — skip mutating side effects (tests / CI)
  */
 
@@ -19,12 +22,20 @@ export function parseEnv(env = process.env) {
 
   return {
     check: mode === 'check',
-    dryRun: env.SLEEPNET_DRY_RUN === '1' || env.SLEEPNET_DRY_RUN === 'true',
+    dryRun: isOn(env.SLEEPNET_DRY_RUN),
     name: emptyToNull(env.SLEEPNET_NAME),
     email: emptyToNull(env.SLEEPNET_EMAIL),
     passphrase: emptyToNull(env.SLEEPNET_PASSPHRASE),
     assistant,
+    dest: emptyToNull(env.SLEEPNET_DEST),
+    allowCloud: isOn(env.SLEEPNET_ALLOW_CLOUD),
+    removePrevious: isOn(env.SLEEPNET_REMOVE_PREVIOUS),
   };
+}
+
+function isOn(v) {
+  const s = String(v ?? '').trim().toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes';
 }
 
 /**

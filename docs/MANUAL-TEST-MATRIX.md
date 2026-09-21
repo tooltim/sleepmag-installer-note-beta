@@ -23,6 +23,24 @@ Status key: **Verified** (ran on real OS) · **Simulated** (unit/dry-run/CI on L
 | Linux `.desktop` entry | n/a | n/a | Simulated (dry-run) |
 | One-liner `irm … bootstrap.ps1 \| iex` | Not run | n/a | n/a |
 | One-liner `curl … install.sh \| bash` | n/a | Not run | Partial (script syntax only) |
+| Destination: default is never OneDrive | **Verified** (live API probe) | Simulated (unit) | **Verified** (unit) |
+| Destination: OneDrive refused with a reason | **Verified** (live API probe) | Simulated (unit) | **Verified** (unit) |
+| Destination: OneDrive allowed via override, warns | **Verified** (live API probe) | Simulated | **Verified** (unit) |
+| Destination: system folder / missing drive refused | **Verified** (live API probe) | Simulated | **Verified** (unit) |
+| Destination: typed folder gets `sleep-network` appended | **Verified** | Simulated | **Verified** (unit) |
+| Real check: empty `sleepmag.cmd` reported as incomplete | **Verified** (unit) | **Verified** (unit) | **Verified** (unit) |
+| Real check: empty/truncated `cli.mjs` reported as incomplete | **Verified** (unit) | **Verified** (unit) | **Verified** (unit) |
+| Real check: copied folder without `.git` reported as incomplete | **Verified** (unit) | **Verified** (unit) | **Verified** (unit) |
+| Real check: status names the exact path | **Verified** (live check run) | Simulated | **Verified** (unit) |
+| Real check: existing shortcuts listed with their targets | **Verified** (live check run) | n/a | n/a |
+| Cleanup: our shortcuts removed, other files untouched | **Verified** (unit) | **Verified** (unit) | **Verified** (unit) |
+| Cleanup: delete guarded (name / system path / not a workspace) | **Verified** (unit) | **Verified** (unit) | **Verified** (unit) |
+| Icon: shipped workspace `.ico` preferred | **Verified** (unit) | n/a | n/a |
+| Icon: zero-byte `.ico` rejected | **Verified** (unit) | n/a | n/a |
+| Icon: written into the workspace, never left in TEMP | **Verified** (unit) | n/a | n/a |
+| Shortcut points at `Sleep Network Launcher.cmd` | **Verified** (unit) | n/a | n/a |
+| Open: reports not-opened honestly with a reason | **Verified** (unit) | **Verified** (unit) | **Verified** (unit) |
+| Open: real launch verified by a live process | Not run (needs full install) | Not run | n/a |
 | Idempotent second run | Not run | Not run | check-mode verified |
 
 ## How to verify on a real machine

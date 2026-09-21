@@ -15,6 +15,15 @@
         <p class="lede">One short setup. Then you work from the desktop launcher.</p>
       </header>
 
+      <section id="state-panel" class="panel state" hidden>
+        <h2 class="state-title">
+          <span id="state-badge" class="badge">checking…</span>
+          <span id="state-summary" class="state-summary"></span>
+        </h2>
+        <ul id="state-checks" class="checks"></ul>
+        <div id="state-extra" class="state-extra"></div>
+      </section>
+
       <section id="form-panel" class="panel">
         <form id="install-form" autocomplete="on">
           <label>
@@ -45,6 +54,24 @@
               <option value="gemini">Gemini CLI</option>
               <option value="all">Install all three</option>
             </select>
+          </label>
+          <label>
+            Install folder
+            <input id="dest" name="dest" type="text" spellcheck="false" autocomplete="off" />
+            <span class="field-note">
+              The workspace folder. Keep it off OneDrive, iCloud and Dropbox — sync corrupts the
+              checkout.
+            </span>
+          </label>
+          <div id="dest-choices" class="choices"></div>
+          <p id="dest-status" class="dest-status" hidden></p>
+          <label id="allow-cloud-row" class="checkbox" hidden>
+            <input id="allow-cloud" name="allowCloud" type="checkbox" />
+            <span>Use this synced folder anyway (not recommended)</span>
+          </label>
+          <label id="remove-previous-row" class="checkbox" hidden>
+            <input id="remove-previous" name="removePrevious" type="checkbox" />
+            <span id="remove-previous-label">Delete the previous install</span>
           </label>
           <p id="form-error" class="error" hidden></p>
           <button type="submit" id="start-btn">

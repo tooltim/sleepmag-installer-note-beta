@@ -6,10 +6,12 @@ import { parseEnv } from './env.js';
 import { setMessenger, banner, say, ok } from './say.js';
 import { createLogger } from './log.js';
 import { runInstall } from './runInstall.js';
-import { resolveWorkspaceDir } from './paths.js';
+import { resolveDocumentsDir } from './paths.js';
+import { validateDestination } from './destination.js';
+import { inspectInstall, findInstalls } from './inspect.js';
+import { findShortcuts } from './cleanup.js';
 import { resolveExe, refreshPath } from './exec.js';
 import { checkReport } from './tools.js';
-import { isWorkspacePresent } from './workspace.js';
 
 /**
  * @param {{
@@ -53,15 +55,36 @@ export async function main(options = {}) {
           resolveExe('python', { env }) || resolveExe('python3', { env }),
         ),
       };
-      const dest = resolveWorkspaceDir({ env });
-      const workspacePresent = isWorkspacePresent(dest);
-      for (const line of checkReport({ have, workspacePresent })) {
+      // Where we would install, and what is actually there — with real paths.
+      const dest = validateDestination(cfg.dest, {
+        env,
+        documentsDir: safeDocuments(env),
+        allowCloud: true,
+        probe: false,
+      }).dest;
+      const install = inspectInstall(dest, { env });
+      const others = findInstalls({ env }).filter(
+        (i) => i.dest.toLowerCase() !== dest.toLowerCase(),
+      );
+      const shortcuts = findShortcuts({ env });
+      const workspacePresent = install.status === 'installed';
+
+      for (const line of checkReport({ have, workspacePresent, install, others, shortcuts })) {
         if (line.startsWith('OK')) ok(line.slice(4).trim());
         else say(line);
       }
-      say(`documents/workspace path: ${dest}`);
+      if (!shortcuts.length) say('shortcut: none found on any Desktop or Start Menu folder');
       say(`Install log: ${logger.logPath}`);
-      return { mode: 'check', have, dest, workspacePresent, logPath: logger.logPath };
+      return {
+        mode: 'check',
+        have,
+        dest,
+        workspacePresent,
+        install,
+        others,
+        shortcuts,
+        logPath: logger.logPath,
+      };
     }
 
     return await runInstall({
@@ -72,6 +95,14 @@ export async function main(options = {}) {
     });
   } finally {
     setMessenger(null);
+  }
+}
+
+function safeDocuments(env) {
+  try {
+    return resolveDocumentsDir({ env });
+  } catch {
+    return null;
   }
 }
 

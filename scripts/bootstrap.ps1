@@ -3,6 +3,9 @@
 # Modes via env (same as the Node installer / legacy install.ps1):
 #   SLEEPNET_MODE=check
 #   SLEEPNET_NAME / SLEEPNET_EMAIL / SLEEPNET_PASSPHRASE / SLEEPNET_ASSISTANT
+#   SLEEPNET_DEST=<folder>        where to install (default: a local, non-synced folder)
+#   SLEEPNET_ALLOW_CLOUD=1        allow OneDrive / iCloud / Dropbox anyway
+#   SLEEPNET_REMOVE_PREVIOUS=1    delete workspaces found elsewhere
 #   SLEEPNET_UI=0   force console CLI instead of browser UI
 
 $ErrorActionPreference = 'Stop'

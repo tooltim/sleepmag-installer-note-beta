@@ -319,3 +319,222 @@ button.ghost {
   color: var(--ink);
   font-weight: 600;
 }
+
+/* ---- Current-install panel, folder picker, verified paths ---- */
+
+.state {
+  margin-bottom: 1rem;
+}
+
+.state-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.75rem;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.state-summary {
+  font-weight: 400;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.badge {
+  flex: none;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.badge-installed {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.badge-partial {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.badge-none {
+  color: var(--pending);
+}
+
+.checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.check {
+  display: grid;
+  grid-template-columns: 1.1rem minmax(6rem, auto) 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.85rem;
+}
+
+.check code {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.check.ok .mark {
+  color: var(--ok);
+}
+
+.check.bad .mark {
+  color: var(--danger);
+}
+
+.check.warn .mark {
+  color: var(--pending);
+}
+
+.state-extra {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.state-extra p {
+  margin: 0.35rem 0;
+}
+
+.state-extra .warn {
+  color: var(--danger);
+}
+
+.paths {
+  list-style: none;
+  margin: 0.25rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.paths code,
+.paths-table code {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  word-break: break-all;
+}
+
+.paths-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+}
+
+.paths-table th {
+  text-align: left;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem 0.2rem 0;
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+.paths-table td {
+  padding: 0.2rem 0;
+}
+
+.field-note {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.1rem 0 0.6rem;
+}
+
+.chip {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--accent);
+}
+
+.chip span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.chip-rec {
+  border-color: var(--ok);
+}
+
+.chip-warn {
+  border-color: var(--danger);
+  opacity: 0.85;
+}
+
+.dest-status {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.dest-status.ok {
+  color: var(--ok);
+}
+
+.dest-status.warn {
+  color: var(--pending);
+}
+
+.dest-status.bad {
+  color: var(--danger);
+}
+
+.checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+.checkbox input {
+  width: auto;
+  margin-top: 0.15rem;
+}
+
+.verify {
+  margin: 0.6rem 0;
+  font-size: 0.85rem;
+}
+
+.verify summary {
+  cursor: pointer;
+}
+
+.muted {
+  color: var(--muted);
+}

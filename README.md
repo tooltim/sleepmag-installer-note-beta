@@ -6,7 +6,10 @@ Public on purpose: teammates can download it before they have access to anything
 
 The default experience is a **guided browser UI**: enter name / e-mail / passphrase, watch each step, and if something fails the page stays open with the failed step and a full error log (also saved under your temp folder as `sleepnet-install.log`).
 
-> The older Windows-only PowerShell installer lives in [`sleep-network-install`](https://github.com/tooltim/sleep-network-install) and is **unchanged**. Use this repo for Windows **and** macOS (Linux best-effort).
+> **This repo is the installer.** It is what the launcher's Team tab hands out, and the only one that
+> gets fixes. The older Windows-only PowerShell installer in
+> [`sleep-network-install`](https://github.com/tooltim/sleep-network-install) is superseded — do not
+> send people there.
 
 ## Install
 
@@ -57,11 +60,44 @@ node sleepmag-installer-note-beta/bin/install.js --cli
 
 | OS | When it finishes |
 |----|------------------|
-| **Windows** | A **Sleep Network Launcher** shortcut (`.lnk`, with Sleep Magazine logo) on your Desktop. It opens automatically after install. |
+| **Windows** | A **Sleep Network Launcher** shortcut (`.lnk`, with the Sleep Magazine icon) on your Desktop, pointing at `Sleep Network Launcher.cmd` in the workspace. |
 | **macOS** | A **Sleep Network Launcher.command** file on your Desktop. Double-click it (first time: right-click → **Open** if Gatekeeper warns). |
-| **Linux** | A `sleep-network-launcher.desktop` entry under `~/.local/share/applications` (and on Desktop when that folder exists). Or run `node ~/Documents/sleep-network/tools/sleepmag/cli.mjs`. |
+| **Linux** | A `sleep-network-launcher.desktop` entry under `~/.local/share/applications` (and on Desktop when that folder exists). |
 
-Workspace location: your OS **Documents** folder `/ sleep-network` (follows OneDrive / iCloud redirects when the OS reports them).
+The final screen prints the **exact paths**: workspace, shortcut, what the shortcut starts, and the
+icon file. When the launcher could not be opened automatically, it says so and why, instead of
+claiming it opened.
+
+### Where it installs
+
+You choose the folder. The installer pre-fills a **local** one and offers the alternatives as
+one-click chips.
+
+Cloud-synced folders (**OneDrive**, iCloud Drive, Dropbox, Google Drive) are **refused by default**:
+sync turns files into on-demand placeholders and locks `.git` mid-operation, which is how a
+workspace ends up half-broken. On Windows this matters because OneDrive silently redirects the
+Documents known folder — so "Documents" is offered only when it is genuinely local. A tick box lets
+you override the refusal if you really want it.
+
+### What it checks
+
+Before and after installing, the installer reads the files rather than trusting that a name exists:
+
+- `.git/` **and** a non-empty `.git/HEAD` (a copied folder is not an install)
+- `tools/sleepmag/cli.mjs` present and not truncated
+- `sleepmag.cmd` present, non-empty, and actually calling `cli.mjs`
+- `CLAUDE.md` and the `sites/` folders
+- every desktop / Start Menu shortcut, where it points, and whether that target still exists
+
+Each result is shown with its full path and size. The install fails loudly if the workspace is
+incomplete afterwards, instead of finishing with a green tick over a broken folder.
+
+### What it removes
+
+Shortcuts of ours (including dead ones pointing at a deleted workspace) are deleted and recreated on
+every run. When a workspace exists somewhere else, the installer lists it and offers to delete it;
+deletion is guarded — the folder must be named `sleep-network`, sit outside system locations, and
+contain workspace files, or it is left alone.
 
 ## If something fails
 
@@ -78,6 +114,9 @@ Workspace location: your OS **Documents** folder `/ sleep-network` (follows OneD
 | `SLEEPNET_EMAIL` | Skip email prompt |
 | `SLEEPNET_PASSPHRASE` | Skip passphrase prompt |
 | `SLEEPNET_ASSISTANT` | `claude` \| `codex` \| `gemini` \| `both` \| `all` \| `none` |
+| `SLEEPNET_DEST` | Install folder (`sleep-network` is appended when missing) |
+| `SLEEPNET_ALLOW_CLOUD=1` | Install into a OneDrive / iCloud / Dropbox folder anyway |
+| `SLEEPNET_REMOVE_PREVIOUS=1` | Delete workspaces found in other locations |
 | `SLEEPNET_DRY_RUN=1` | Skip mutating side effects (tests) |
 | `SLEEPNET_UI=0` | Force console CLI instead of browser UI |
 
@@ -100,7 +139,11 @@ SLEEPNET_MODE=check curl -fsSL https://raw.githubusercontent.com/tooltim/sleepma
 - Windows winget calls use `--source winget` to avoid Microsoft Store cert failures (`0x8a15005e`).
 - Optional Claude Code / Codex installs never abort setup if they fail or stay off `PATH`.
 - sleepmag exit codes that only complain about missing `claude`/`codex`/`gemini` soft-continue when passphrase + platform steps succeeded.
-- Step order matches the current PowerShell installer: tools → workspace → assistants → setup → launcher.
+- Step order: tools → clean up → workspace → assistants → setup → verify → launcher → open.
+- The destination is decided and probed for write access **before** anything is downloaded or deleted.
+- The desktop icon starts `Sleep Network Launcher.cmd` (the launcher window), not `sleepmag.cmd` (the bare CLI).
+- The `.ico` is taken from the workspace itself, so the shortcut never points into a temp folder that gets cleaned.
+- "Opened" is only reported when a process actually started and was still alive a moment later.
 
 ## Development
 
