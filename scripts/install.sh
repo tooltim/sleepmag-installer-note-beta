@@ -39,7 +39,7 @@ ensure_node
 
 # Which branch of the installer to run; a test branch ships a copy of this file
 # with SLEEPNET_DEFAULT_BRANCH set to itself.
-SLEEPNET_DEFAULT_BRANCH="main"
+SLEEPNET_DEFAULT_BRANCH="team-test"
 BRANCH="${SLEEPNET_BRANCH:-$SLEEPNET_DEFAULT_BRANCH}"
 [[ "$BRANCH" != "main" ]] && say "installer branch: $BRANCH"
 

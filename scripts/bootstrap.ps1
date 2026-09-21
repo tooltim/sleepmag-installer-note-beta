@@ -76,7 +76,7 @@ Ok ("node " + (& $node --version))
 # Which branch of the installer to run. A test branch ships a copy of this file
 # with SLEEPNET_DEFAULT_BRANCH set to itself, so sharing that branch's raw URL
 # runs THAT branch instead of silently falling back to main.
-$SLEEPNET_DEFAULT_BRANCH = 'main'
+$SLEEPNET_DEFAULT_BRANCH = 'team-test'
 $Branch = if ($env:SLEEPNET_BRANCH) { $env:SLEEPNET_BRANCH } else { $SLEEPNET_DEFAULT_BRANCH }
 if ($Branch -ne 'main') { Say ("installer branch: " + $Branch) }
 
