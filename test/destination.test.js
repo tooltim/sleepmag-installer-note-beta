@@ -91,7 +91,7 @@ describe('destinationCandidates', () => {
       home: 'C:\\Users\\bob',
       documentsDir: 'C:\\Users\\bob\\Documents',
     });
-    assert.equal(list[0].path, path.join('C:\\Users\\bob\\Documents', 'sleep-network'));
+    assert.equal(list[0].path, path.win32.join('C:\\Users\\bob\\Documents', 'sleep-network'));
     assert.equal(list[0].recommended, true);
   });
 });
@@ -105,7 +105,7 @@ describe('defaultDestination', () => {
       documentsDir: 'C:\\Users\\ina\\OneDrive\\Documents',
     });
     assert.ok(!/OneDrive/i.test(dest), `${dest} must not be in OneDrive`);
-    assert.equal(path.basename(dest), 'sleep-network');
+    assert.equal(path.win32.basename(dest), 'sleep-network');
   });
 });
 
@@ -115,27 +115,27 @@ describe('normalizeDestination', () => {
   it('appends sleep-network to a plain folder', () => {
     assert.equal(
       normalizeDestination('C:\\Users\\ina\\Documents', ctx),
-      path.normalize('C:\\Users\\ina\\Documents\\sleep-network'),
+      path.win32.normalize('C:\\Users\\ina\\Documents\\sleep-network'),
     );
   });
 
   it('leaves a path that already ends in sleep-network', () => {
     assert.equal(
       normalizeDestination('C:\\Users\\ina\\Documents\\sleep-network', ctx),
-      path.normalize('C:\\Users\\ina\\Documents\\sleep-network'),
+      path.win32.normalize('C:\\Users\\ina\\Documents\\sleep-network'),
     );
   });
 
   it('strips quotes and trailing slashes', () => {
     assert.equal(
       normalizeDestination('"C:\\Users\\ina\\Documents\\"', ctx),
-      path.normalize('C:\\Users\\ina\\Documents\\sleep-network'),
+      path.win32.normalize('C:\\Users\\ina\\Documents\\sleep-network'),
     );
   });
 
   it('expands ~', () => {
     const out = normalizeDestination('~/code', { platform: 'linux', env: {}, home: '/home/ina' });
-    assert.equal(out, path.normalize('/home/ina/code/sleep-network'));
+    assert.equal(out, path.posix.normalize('/home/ina/code/sleep-network'));
   });
 
   it('returns empty for empty input', () => {
@@ -180,7 +180,7 @@ describe('validateDestination', () => {
     const v = validateDestination('C:\\Users\\ina\\Documents', base);
     assert.equal(v.ok, true);
     assert.equal(v.errors.length, 0);
-    assert.equal(path.basename(v.dest), 'sleep-network');
+    assert.equal(path.win32.basename(v.dest), 'sleep-network');
   });
 
   it('refuses a system folder', () => {

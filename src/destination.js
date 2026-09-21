@@ -10,9 +10,28 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { platformInfo, joinPath, pathExists } from './platform.js';
+import { platformInfo, pathExists } from './platform.js';
 
 export const WORKSPACE_NAME = 'sleep-network';
+
+/**
+ * Path helpers for the platform being judged, not the one we run on.
+ * Without this, a Windows path is parsed with posix rules when the tests (or a
+ * future cross-platform check) run on Linux, and every separator is missed.
+ * @param {string} platform
+ */
+function pathFor(platform) {
+  return platform === 'win32' ? path.win32 : path.posix;
+}
+
+/** Separator-agnostic form for comparing two paths. */
+function forCompare(p) {
+  return String(p || '')
+    .replace(/\\/g, '/')
+    .replace(/\/+/g, '/')
+    .replace(/\/+$/, '')
+    .toLowerCase();
+}
 
 /** Cloud-sync roots we refuse by default, with the label we show the user. */
 const CLOUD_PATTERNS = [
@@ -66,11 +85,11 @@ export function detectCloudSync(p, ctx = {}) {
 /** True when `child` is the same as, or below, `parent`. */
 export function isInside(parent, child) {
   if (!parent || !child) return false;
-  const norm = (v) => path.resolve(String(v)).replace(/[\\/]+$/, '').toLowerCase();
-  const a = norm(parent);
-  const b = norm(child);
+  const a = forCompare(parent);
+  const b = forCompare(child);
+  if (!a || !b) return false;
   if (a === b) return true;
-  return b.startsWith(a + path.sep.toLowerCase()) || b.startsWith(a + '/') || b.startsWith(a + '\\');
+  return b.startsWith(a + '/');
 }
 
 /**
@@ -86,14 +105,15 @@ export function destinationCandidates(ctx = {}) {
   const info = platformInfo(platform, env);
   const home = ctx.home || info.home;
   const docs = ctx.documentsDir || null;
+  const P = pathFor(platform);
 
   /** @type {Array<{path:string,label:string,note:string,cloud:any,recommended:boolean}>} */
   const out = [];
   const seen = new Set();
   const push = (dir, label, note) => {
     if (!dir) return;
-    const full = joinPath(dir, WORKSPACE_NAME);
-    const key = path.normalize(full).toLowerCase();
+    const full = P.join(dir, WORKSPACE_NAME);
+    const key = forCompare(full);
     if (seen.has(key)) return;
     seen.add(key);
     const cloud = detectCloudSync(full, { env });
@@ -108,7 +128,7 @@ export function destinationCandidates(ctx = {}) {
 
   if (docs) push(docs, 'Documents', 'your usual Documents folder');
   if (platform === 'win32') {
-    push(joinPath(home, 'Documents'), 'Local Documents', 'the real Documents folder on this PC');
+    push(P.join(home, 'Documents'), 'Local Documents', 'the real Documents folder on this PC');
   }
   push(home, 'Home folder', 'always local, never cloud-synced');
 
@@ -129,8 +149,9 @@ export function defaultDestination(ctx = {}) {
   const local = candidates.find((c) => !c.cloud);
   if (local) return local.path;
   if (candidates.length) return candidates[0].path;
-  const info = platformInfo(ctx.platform || process.platform, ctx.env || process.env);
-  return joinPath(ctx.home || info.home, WORKSPACE_NAME);
+  const platform = ctx.platform || process.platform;
+  const info = platformInfo(platform, ctx.env || process.env);
+  return pathFor(platform).join(ctx.home || info.home, WORKSPACE_NAME);
 }
 
 /**
@@ -147,22 +168,23 @@ export function normalizeDestination(input, ctx = {}) {
   const env = ctx.env || process.env;
   const info = platformInfo(platform, env);
   const home = ctx.home || info.home;
+  const P = pathFor(platform);
 
   let s = String(input || '')
     .trim()
     .replace(/^['"]|['"]$/g, '');
   if (!s) return '';
   if (s === '~' || s.startsWith('~/') || s.startsWith('~\\')) {
-    s = joinPath(home, s.slice(1));
+    s = P.join(home, s.slice(1));
   }
   s = s.replace(/[\\/]+$/, '');
   if (!s) return '';
 
-  const base = path.basename(s);
+  const base = P.basename(s);
   if (base.toLowerCase() !== WORKSPACE_NAME) {
-    s = joinPath(s, WORKSPACE_NAME);
+    s = P.join(s, WORKSPACE_NAME);
   }
-  return path.normalize(s);
+  return P.normalize(s);
 }
 
 /**
@@ -223,7 +245,7 @@ export function validateDestination(input, ctx = {}) {
       warnings,
     };
   }
-  if (!path.isAbsolute(dest)) {
+  if (!pathFor(platform).isAbsolute(dest)) {
     errors.push(
       `Use a full path, like ${platform === 'win32' ? 'C:\\Users\\you\\sleep-network' : '/Users/you/sleep-network'}.`,
     );

@@ -188,18 +188,25 @@ export function isRemovableWorkspace(dest, ctx = {}) {
   const info = platformInfo(platform, env);
   if (!dest) return { ok: false, reason: 'no path given' };
 
-  const full = path.resolve(dest);
-  if (path.basename(full).toLowerCase() !== WORKSPACE_NAME) {
-    return { ok: false, reason: `not a workspace folder name (${path.basename(full)})` };
+  // Judge the path with the rules of the platform it belongs to, not ours.
+  const P = platform === 'win32' ? path.win32 : path.posix;
+  const full = P.isAbsolute(String(dest)) ? P.normalize(String(dest)) : path.resolve(String(dest));
+  const base = P.basename(full);
+  if (base.toLowerCase() !== WORKSPACE_NAME) {
+    return { ok: false, reason: `not a workspace folder name (${base})` };
   }
   if (isForbiddenLocation(full, platform)) {
     return { ok: false, reason: 'system location' };
   }
-  const root = path.parse(full).root;
-  if (full === root || path.dirname(full) === full) {
+  const root = P.parse(full).root;
+  if (full === root || P.dirname(full) === full) {
     return { ok: false, reason: 'drive root' };
   }
-  if (info.home && path.resolve(info.home).toLowerCase() === full.toLowerCase()) {
+  const sameAsHome =
+    info.home &&
+    String(info.home).replace(/[\\/]+$/, '').toLowerCase() ===
+      full.replace(/[\\/]+$/, '').toLowerCase();
+  if (sameAsHome) {
     return { ok: false, reason: 'that is your home folder' };
   }
   if (!pathExists(full)) return { ok: false, reason: 'nothing there' };
