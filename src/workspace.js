@@ -13,6 +13,31 @@ import { workspaceMarkerPath } from './paths.js';
 export const REPO_URL = 'https://github.com/tooltim/sleep-network.git';
 
 /**
+ * Git environment for the clone/pull.
+ *
+ * GIT_TERMINAL_PROMPT=0 matters: with no credential helper installed, git asks
+ * for a username on a terminal nobody can see from the installer UI, and the
+ * step sits there until the timeout instead of turning red. Credential helpers
+ * (Git Credential Manager, gh) are unaffected — they are not terminal prompts,
+ * so the browser login still works.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+export function gitEnv(env = process.env) {
+  return { ...env, GIT_TERMINAL_PROMPT: '0' };
+}
+
+/**
+ * Does this git failure look like "you do not have access"?
+ * @param {string} output
+ */
+export function looksLikeAuthFailure(output) {
+  return /repository not found|authentication failed|could not read (username|password)|terminal prompts disabled|permission denied|access denied|403/i.test(
+    String(output || ''),
+  );
+}
+
+/**
  * @param {{ dest: string, gitExe: string, dryRun?: boolean, repoUrl?: string }} opts
  */
 export function ensureWorkspace(opts) {
@@ -37,18 +62,23 @@ export function ensureWorkspace(opts) {
       `downloading the workspace into ${dest} (a GitHub login window may open: use your GitHub account)…`,
     );
     if (!opts.dryRun) {
-      const r = run(git, ['clone', repo, dest], { timeout: 600_000 });
+      const r = run(git, ['clone', repo, dest], { timeout: 600_000, env: gitEnv() });
       if (r.code !== 0) {
+        const output = r.combined || r.stderr || r.stdout;
         showPrivateRepoAuthHelp(dest);
-        throw new Error(
-          `git clone of tooltim/sleep-network failed (exit ${r.code}). Fix GitHub access and re-run; installer will not continue.\n${r.combined || r.stderr || r.stdout}`,
-        );
+        const headline = looksLikeAuthFailure(output)
+          ? 'GitHub did not let this account read tooltim/sleep-network. Ask Tim for an invite, sign in with that same account, and run the installer again.'
+          : `git clone of tooltim/sleep-network failed (exit ${r.code}). Fix GitHub access and re-run; installer will not continue.`;
+        throw new Error(`${headline}\n${output}`);
       }
     }
   } else {
     say('workspace already present, updating…');
     if (!opts.dryRun) {
-      const r = run(git, ['-C', dest, 'pull', '--ff-only'], { timeout: 300_000 });
+      const r = run(git, ['-C', dest, 'pull', '--ff-only'], {
+        timeout: 300_000,
+        env: gitEnv(),
+      });
       if (r.code !== 0) {
         say(`git pull reported exit ${r.code} (continuing with existing checkout)`);
         if (r.combined) say(r.combined.trim().split('\n').slice(0, 8).join('\n'));
