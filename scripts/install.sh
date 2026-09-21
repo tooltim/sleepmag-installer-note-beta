@@ -37,21 +37,28 @@ ensure_node() {
 
 ensure_node
 
-BOOTSTRAP_DIR="${TMPDIR:-/tmp}/sleepmag-installer-note-beta"
+# Which branch of the installer to run; a test branch ships a copy of this file
+# with SLEEPNET_DEFAULT_BRANCH set to itself.
+SLEEPNET_DEFAULT_BRANCH="main"
+BRANCH="${SLEEPNET_BRANCH:-$SLEEPNET_DEFAULT_BRANCH}"
+[[ "$BRANCH" != "main" ]] && say "installer branch: $BRANCH"
+
+BOOTSTRAP_DIR="${TMPDIR:-/tmp}/sleepmag-installer-${BRANCH//[^A-Za-z0-9._-]/-}"
 REPO="https://github.com/tooltim/sleepmag-installer-note-beta.git"
 
 if have git; then
   if [[ ! -d "$BOOTSTRAP_DIR/.git" ]]; then
     rm -rf "$BOOTSTRAP_DIR"
-    git clone -q "$REPO" "$BOOTSTRAP_DIR"
+    git clone -q --branch "$BRANCH" --single-branch "$REPO" "$BOOTSTRAP_DIR"
   else
-    git -C "$BOOTSTRAP_DIR" pull -q --ff-only || true
+    git -C "$BOOTSTRAP_DIR" fetch -q origin "$BRANCH" || true
+    git -C "$BOOTSTRAP_DIR" checkout -q -B "$BRANCH" "origin/$BRANCH" || true
   fi
 else
   say "Git not found — downloading bootstrap zip…"
   ZIP="${TMPDIR:-/tmp}/sleepmag-installer-note-beta.zip"
   EXTRACT_ROOT="${TMPDIR:-/tmp}/sleepmag-installer-note-beta-extract"
-  curl -fsSL -o "$ZIP" "https://github.com/tooltim/sleepmag-installer-note-beta/archive/refs/heads/main.zip"
+  curl -fsSL -o "$ZIP" "https://github.com/tooltim/sleepmag-installer-note-beta/archive/refs/heads/${BRANCH}.zip"
   rm -rf "$BOOTSTRAP_DIR" "$EXTRACT_ROOT"
   mkdir -p "$EXTRACT_ROOT"
   unzip -q "$ZIP" -d "$EXTRACT_ROOT"

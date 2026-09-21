@@ -50,13 +50,13 @@ Write-Host ""; Write-Host "Sleep Network bootstrap (Windows)" -ForegroundColor C
 Refresh-Path
 $node = Resolve-Node
 if (-not $node) {
-    Say "Node.js not found — installing…"
+    Say "Node.js not found - installing..."
     if (Have 'winget') {
         # Pin --source winget: msstore often fails with cert error 0x8a15005e
         try {
             winget install --id OpenJS.NodeJS.LTS -e --source winget --silent --accept-package-agreements --accept-source-agreements
         } catch {
-            Say "winget reported an error; trying nodejs.org MSI…"
+            Say "winget reported an error; trying nodejs.org MSI..."
         }
         $node = Wait-Node 20
     }
@@ -73,27 +73,35 @@ if (-not $node) {
 if (-not $node) { throw "Node.js is required. Install from https://nodejs.org and re-run." }
 Ok ("node " + (& $node --version))
 
-$BootstrapDir = Join-Path $env:TEMP 'sleepmag-installer-note-beta'
+# Which branch of the installer to run. A test branch ships a copy of this file
+# with SLEEPNET_DEFAULT_BRANCH set to itself, so sharing that branch's raw URL
+# runs THAT branch instead of silently falling back to main.
+$SLEEPNET_DEFAULT_BRANCH = 'main'
+$Branch = if ($env:SLEEPNET_BRANCH) { $env:SLEEPNET_BRANCH } else { $SLEEPNET_DEFAULT_BRANCH }
+if ($Branch -ne 'main') { Say ("installer branch: " + $Branch) }
+
+$BootstrapDir = Join-Path $env:TEMP ('sleepmag-installer-' + ($Branch -replace '[^A-Za-z0-9._-]', '-'))
 $Repo = 'https://github.com/tooltim/sleepmag-installer-note-beta.git'
 if (-not (Have 'git')) {
-    Say "Git not found — downloading bootstrap zip…"
+    Say "Git not found - downloading bootstrap zip..."
     $zip = Join-Path $env:TEMP 'sleepmag-installer-note-beta.zip'
-    Invoke-WebRequest 'https://github.com/tooltim/sleepmag-installer-note-beta/archive/refs/heads/main.zip' -OutFile $zip
+    Invoke-WebRequest ('https://github.com/tooltim/sleepmag-installer-note-beta/archive/refs/heads/' + $Branch + '.zip') -OutFile $zip
     $extractRoot = Join-Path $env:TEMP 'sleepmag-installer-note-beta-extract'
     if (Test-Path $extractRoot) { Remove-Item -Recurse -Force $extractRoot }
     if (Test-Path $BootstrapDir) { Remove-Item -Recurse -Force $BootstrapDir }
     New-Item -ItemType Directory -Path $extractRoot | Out-Null
     Expand-Archive -Path $zip -DestinationPath $extractRoot -Force
     $extracted = Get-ChildItem $extractRoot -Directory | Select-Object -First 1
-    if (-not $extracted) { throw "Zip extract failed — no folder under $extractRoot" }
+    if (-not $extracted) { throw "Zip extract failed - no folder under $extractRoot" }
     Move-Item -Path $extracted.FullName -Destination $BootstrapDir
     Remove-Item -Recurse -Force $extractRoot -ErrorAction SilentlyContinue
 } else {
     if (-not (Test-Path (Join-Path $BootstrapDir '.git'))) {
         if (Test-Path $BootstrapDir) { Remove-Item -Recurse -Force $BootstrapDir }
-        git clone -q $Repo $BootstrapDir
+        git clone -q --branch $Branch --single-branch $Repo $BootstrapDir
     } else {
-        git -C $BootstrapDir pull -q --ff-only 2>$null
+        git -C $BootstrapDir fetch -q origin $Branch 2>$null
+        git -C $BootstrapDir checkout -q -B $Branch ("origin/" + $Branch) 2>$null
     }
 }
 
@@ -108,6 +116,6 @@ if ($env:SLEEPNET_MODE -eq 'check' -or $env:SLEEPNET_UI -eq '0') {
     $installArgs += '--ui'
 }
 
-Say "Opening the installer…"
+Say "Opening the installer..."
 & $node @installArgs
 exit $LASTEXITCODE
