@@ -38,6 +38,38 @@ export function looksLikeAuthFailure(output) {
 }
 
 /**
+ * Did run() give up because the timeout fired? spawnSync kills the child and
+ * reports ETIMEDOUT with no git output at all, which used to surface as a bare
+ * "exit 1" and got blamed on a missing invite.
+ * @param {{ error?: any }} r
+ */
+export function timedOut(r) {
+  return Boolean(r && r.error && r.error.code === 'ETIMEDOUT');
+}
+
+/**
+ * One headline for a failed ls-remote / clone, from the most specific cause.
+ * @param {{ code: number, error?: any, combined?: string, stderr?: string, stdout?: string }} r
+ * @param {'sign-in'|'download'} what
+ * @param {number} minutes  the timeout that applied
+ */
+export function describeGitFailure(r, what, minutes) {
+  const output = r.combined || r.stderr || r.stdout || '';
+  if (timedOut(r)) {
+    return what === 'sign-in'
+      ? `The GitHub sign-in never finished (gave up after ${minutes} min). The login window may be hidden behind other windows: look for it in the taskbar, sign in with the account Tim invited, and run the installer again.`
+      : `The download of tooltim/sleep-network did not finish in ${minutes} min. Check the internet connection and run the installer again.`;
+  }
+  if (looksLikeAuthFailure(output)) {
+    return 'GitHub did not let this account read tooltim/sleep-network. Accept the invite Tim sent (invites expire after 7 days: ask for a new one if needed), sign in with that same account, and run the installer again.';
+  }
+  return `git ${what === 'sign-in' ? 'ls-remote' : 'clone'} of tooltim/sleep-network failed (exit ${r.code}). Installer will not continue.`;
+}
+
+const SIGNIN_TIMEOUT_MIN = 5;
+const CLONE_TIMEOUT_MIN = 15;
+
+/**
  * @param {{ dest: string, gitExe: string, dryRun?: boolean, repoUrl?: string }} opts
  */
 export function ensureWorkspace(opts) {
@@ -62,14 +94,26 @@ export function ensureWorkspace(opts) {
       `downloading the workspace into ${dest} (a GitHub login window may open: use your GitHub account)…`,
     );
     if (!opts.dryRun) {
-      const r = run(git, ['clone', repo, dest], { timeout: 600_000, env: gitEnv() });
-      if (r.code !== 0) {
-        const output = r.combined || r.stderr || r.stdout;
+      // Check access first with a cheap ls-remote: the sign-in happens here, so a
+      // login nobody completes or a missing invite fails in minutes, and is told
+      // apart from a slow download.
+      const probe = run(git, ['ls-remote', '--heads', repo], {
+        timeout: SIGNIN_TIMEOUT_MIN * 60_000,
+        env: gitEnv(),
+      });
+      if (probe.code !== 0) {
         showPrivateRepoAuthHelp(dest);
-        const headline = looksLikeAuthFailure(output)
-          ? 'GitHub did not let this account read tooltim/sleep-network. Ask Tim for an invite, sign in with that same account, and run the installer again.'
-          : `git clone of tooltim/sleep-network failed (exit ${r.code}). Fix GitHub access and re-run; installer will not continue.`;
-        throw new Error(`${headline}\n${output}`);
+        throw new Error(
+          `${describeGitFailure(probe, 'sign-in', SIGNIN_TIMEOUT_MIN)}\n${probe.combined || ''}`,
+        );
+      }
+      ok('GitHub access to tooltim/sleep-network confirmed');
+      const r = run(git, ['clone', repo, dest], {
+        timeout: CLONE_TIMEOUT_MIN * 60_000,
+        env: gitEnv(),
+      });
+      if (r.code !== 0) {
+        throw new Error(`${describeGitFailure(r, 'download', CLONE_TIMEOUT_MIN)}\n${r.combined || ''}`);
       }
     }
   } else {
