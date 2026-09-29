@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { gitEnv, looksLikeAuthFailure, ensureWorkspace, isWorkspaceComplete } from '../src/workspace.js';
+import {
+  gitEnv,
+  looksLikeAuthFailure,
+  describeGitFailure,
+  timedOut,
+  ensureWorkspace,
+  isWorkspaceComplete,
+} from '../src/workspace.js';
 
 describe('gitEnv', () => {
   it('disables terminal prompting so a missing invite fails instead of hanging', () => {
@@ -54,5 +61,32 @@ describe('ensureWorkspace refuses to report success it did not earn', () => {
     } catch {
       /* ignore */
     }
+  });
+});
+
+describe('describeGitFailure', () => {
+  // What spawnSync hands back when the timeout kills git mid sign-in.
+  const killed = { code: 1, error: { code: 'ETIMEDOUT' }, combined: "Cloning into 'x'...\n" };
+
+  it('blames an unfinished sign-in, not a missing invite, when the probe timed out', () => {
+    assert.equal(timedOut(killed), true);
+    const msg = describeGitFailure(killed, 'sign-in', 5);
+    assert.match(msg, /sign-in never finished/);
+    assert.doesNotMatch(msg, /invite Tim sent/);
+  });
+
+  it('blames the connection when the download itself timed out', () => {
+    assert.match(describeGitFailure(killed, 'download', 15), /did not finish in 15 min/);
+  });
+
+  it('points at the invite when GitHub says the repo is not found', () => {
+    const r = { code: 128, combined: 'remote: Repository not found.' };
+    assert.equal(timedOut(r), false);
+    assert.match(describeGitFailure(r, 'sign-in', 5), /invite/);
+  });
+
+  it('falls back to the exit code for anything else', () => {
+    const r = { code: 128, combined: 'Could not resolve host: github.com' };
+    assert.match(describeGitFailure(r, 'download', 15), /exit 128/);
   });
 });
