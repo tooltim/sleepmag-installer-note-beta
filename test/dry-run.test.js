@@ -28,9 +28,9 @@ describe('dry-run / check mode integration', () => {
 });
 
 describe('ensureWorkspace dry-run', () => {
-  it('does not clone when dryRun', () => {
+  it('does not clone when dryRun', async () => {
     const dest = path.join(os.tmpdir(), `sn-dry-${Date.now()}`, 'sleep-network');
-    ensureWorkspace({ dest, gitExe: 'git', dryRun: true });
+    await ensureWorkspace({ dest, gitExe: 'git', dryRun: true });
     assert.equal(fs.existsSync(dest), false);
   });
 });

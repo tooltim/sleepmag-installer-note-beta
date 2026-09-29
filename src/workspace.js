@@ -6,26 +6,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathExists, joinPath } from './platform.js';
-import { run, resolveExe } from './exec.js';
+import { run } from './exec.js';
 import { say, ok } from './say.js';
+import { ensureGitHubAccess, probeEnv } from './githubAuth.js';
 import { workspaceMarkerPath } from './paths.js';
 
 export const REPO_URL = 'https://github.com/tooltim/sleep-network.git';
-
-/**
- * Git environment for the clone/pull.
- *
- * GIT_TERMINAL_PROMPT=0 matters: with no credential helper installed, git asks
- * for a username on a terminal nobody can see from the installer UI, and the
- * step sits there until the timeout instead of turning red. Credential helpers
- * (Git Credential Manager, gh) are unaffected — they are not terminal prompts,
- * so the browser login still works.
- *
- * @param {NodeJS.ProcessEnv} [env]
- */
-export function gitEnv(env = process.env) {
-  return { ...env, GIT_TERMINAL_PROMPT: '0' };
-}
 
 /**
  * Does this git failure look like "you do not have access"?
@@ -38,9 +24,9 @@ export function looksLikeAuthFailure(output) {
 }
 
 /**
- * @param {{ dest: string, gitExe: string, dryRun?: boolean, repoUrl?: string }} opts
+ * @param {{ dest: string, gitExe: string, dryRun?: boolean, repoUrl?: string, interactiveSignIn?: boolean }} opts
  */
-export function ensureWorkspace(opts) {
+export async function ensureWorkspace(opts) {
   const dest = opts.dest;
   const git = opts.gitExe;
   const repo = opts.repoUrl || REPO_URL;
@@ -57,12 +43,14 @@ export function ensureWorkspace(opts) {
         );
       }
     }
-    if (!opts.dryRun) ensureGitHubAuthReady();
-    say(
-      `downloading the workspace into ${dest} (a GitHub login window may open: use your GitHub account)…`,
-    );
     if (!opts.dryRun) {
-      const r = run(git, ['clone', repo, dest], { timeout: 600_000, env: gitEnv() });
+      await ensureGitHubAccess({ git, repo, interactive: opts.interactiveSignIn });
+    }
+    say(`downloading the workspace into ${dest}…`);
+    if (!opts.dryRun) {
+      // Access is confirmed above, so the clone must never stop to ask: a
+      // prompt here would open in the hidden installer process and hang.
+      const r = run(git, ['clone', repo, dest], { timeout: 600_000, env: probeEnv() });
       if (r.code !== 0) {
         const output = r.combined || r.stderr || r.stdout;
         showPrivateRepoAuthHelp(dest);
@@ -77,7 +65,7 @@ export function ensureWorkspace(opts) {
     if (!opts.dryRun) {
       const r = run(git, ['-C', dest, 'pull', '--ff-only'], {
         timeout: 300_000,
-        env: gitEnv(),
+        env: probeEnv(),
       });
       if (r.code !== 0) {
         say(`git pull reported exit ${r.code} (continuing with existing checkout)`);
@@ -120,30 +108,10 @@ export function isWorkspacePresent(dest, platform = process.platform) {
   return pathExists(workspaceMarkerPath(dest, platform)) || isWorkspaceComplete(dest);
 }
 
-function ensureGitHubAuthReady() {
-  // Soft tips only — never force interactive gh auth login (that hangs UI / confuses coworkers).
-  const gh = resolveExe('gh');
-  if (!gh) {
-    say('If Git asks you to sign in, use the GitHub account Tim invited to tooltim/sleep-network.');
-    return;
-  }
-  try {
-    const st = run(gh, ['auth', 'status'], { timeout: 15_000 });
-    if (st.code === 0) {
-      run(gh, ['auth', 'setup-git'], { timeout: 15_000 });
-      ok('GitHub CLI already signed in');
-      return;
-    }
-    say('GitHub CLI is installed but not signed in. A browser login may appear during download — that is normal.');
-  } catch {
-    say('If Git asks you to sign in, use the GitHub account Tim invited to tooltim/sleep-network.');
-  }
-}
-
 function showPrivateRepoAuthHelp(dest) {
   say('Could not download the private workspace. Usually that means GitHub access is missing.');
   say('Fix, then run the installer again:');
   say('  1. Ask Tim to invite your GitHub account to tooltim/sleep-network');
-  say('  2. Sign in when Git (or gh) asks — same invited account');
+  say('  2. Sign in to GitHub on this computer with that same invited account');
   if (dest) say(`  3. If a half-downloaded folder exists, delete it: ${dest}`);
 }

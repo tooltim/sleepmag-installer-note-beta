@@ -204,7 +204,7 @@ export async function runInstall(options = {}) {
     });
 
     await runStep('workspace', async () => {
-      ensureWorkspace({ dest, gitExe: state.git, dryRun });
+      await ensureWorkspace({ dest, gitExe: state.git, dryRun });
       return dest;
     });
 
