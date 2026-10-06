@@ -39,6 +39,19 @@ jobs:
           SLEEPNET_MODE: check
           SLEEPNET_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: /bin/bash scripts/install.sh
+      # curl | bash reads the script from a pipe while running it: a command that
+      # reads stdin (brew install did, on a real Mac) used to swallow the rest and
+      # end the script silently. A node shim that drains stdin reproduces that.
+      - name: Piped like curl | bash, with a stdin-eating command
+        env:
+          SLEEPNET_MODE: check
+          SLEEPNET_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/shim"
+          printf '#!/bin/bash\ncat >/dev/null\nexec "%s" "$@"\n' "$(command -v node)" > "$RUNNER_TEMP/shim/node"
+          chmod +x "$RUNNER_TEMP/shim/node"
+          cat scripts/install.sh | PATH="$RUNNER_TEMP/shim:$PATH" /bin/bash | tee "$RUNNER_TEMP/piped.txt"
+          grep -q "Sleep Network installer" "$RUNNER_TEMP/piped.txt"
 
   # Windows stays the main platform: the same tests on a real Windows runner.
   windows:

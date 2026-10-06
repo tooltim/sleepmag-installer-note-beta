@@ -141,9 +141,9 @@ ensure_mac_tools() {
   say "missing on this Mac:$missing"
   ensure_brew
   # Plain `node`, not node@22: the versioned formula is keg-only and never lands on PATH.
-  have node || brew install node
-  mac_git_works || brew install git
-  have gh || brew install gh
+  have node || brew install node </dev/null
+  mac_git_works || brew install git </dev/null
+  have gh || brew install gh </dev/null
 }
 
 ensure_node() {
@@ -153,10 +153,10 @@ ensure_node() {
   fi
   say "Node.js not found — installing…"
   if have brew; then
-    brew install node@22 || brew install node
+    brew install node@22 </dev/null || brew install node </dev/null
   elif [[ "$(uname -s)" == "Linux" ]] && have apt-get; then
-    sudo apt-get update -y
-    sudo apt-get install -y nodejs npm
+    sudo apt-get update -y </dev/null
+    sudo apt-get install -y nodejs npm </dev/null
   else
     say "Install Node 18+ from https://nodejs.org, then re-run."
     exit 1
@@ -169,60 +169,68 @@ ensure_node() {
   ok "node $(node --version)"
 }
 
-if [[ "$IS_MAC" == "1" ]]; then
-  ensure_mac_tools
-fi
-ensure_node
-if [[ "$IS_MAC" == "1" ]]; then
-  mac_github_signin
-fi
-
-# Which branch of the installer to run; a test branch ships a copy of this file
-# with SLEEPNET_DEFAULT_BRANCH set to itself.
-SLEEPNET_DEFAULT_BRANCH="main"
-BRANCH="${SLEEPNET_BRANCH:-$SLEEPNET_DEFAULT_BRANCH}"
-[[ "$BRANCH" != "main" ]] && say "installer branch: $BRANCH"
-
-BOOTSTRAP_DIR="${TMPDIR:-/tmp}/sleepmag-installer-${BRANCH//[^A-Za-z0-9._-]/-}"
-REPO="https://github.com/tooltim/sleepmag-installer-note-beta.git"
-
-if have git && { [[ "$IS_MAC" != "1" ]] || mac_git_works; }; then
-  if [[ ! -d "$BOOTSTRAP_DIR/.git" ]]; then
-    rm -rf "$BOOTSTRAP_DIR"
-    git clone -q --branch "$BRANCH" --single-branch "$REPO" "$BOOTSTRAP_DIR"
-  else
-    git -C "$BOOTSTRAP_DIR" fetch -q origin "$BRANCH" || true
-    git -C "$BOOTSTRAP_DIR" checkout -q -B "$BRANCH" "origin/$BRANCH" || true
+# Everything runs from main(), called on the LAST line. Through curl | bash, bash
+# reads this file as it runs it, so a command that reads stdin (brew install does)
+# swallowed the rest of the script and it ended silently after installing gh.
+# Wrapped in a function, the whole file is read before any of it runs.
+main() {
+  if [[ "$IS_MAC" == "1" ]]; then
+    ensure_mac_tools
   fi
-else
-  say "Git not found — downloading bootstrap zip…"
-  ZIP="${TMPDIR:-/tmp}/sleepmag-installer-note-beta.zip"
-  EXTRACT_ROOT="${TMPDIR:-/tmp}/sleepmag-installer-note-beta-extract"
-  curl -fsSL -o "$ZIP" "https://github.com/tooltim/sleepmag-installer-note-beta/archive/refs/heads/${BRANCH}.zip"
-  rm -rf "$BOOTSTRAP_DIR" "$EXTRACT_ROOT"
-  mkdir -p "$EXTRACT_ROOT"
-  unzip -q "$ZIP" -d "$EXTRACT_ROOT"
-  EXTRACTED="$(find "$EXTRACT_ROOT" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-  if [[ -z "$EXTRACTED" ]]; then
-    say "Zip extract failed under $EXTRACT_ROOT"
+  ensure_node
+  if [[ "$IS_MAC" == "1" ]]; then
+    mac_github_signin
+  fi
+
+  # Which branch of the installer to run; a test branch ships a copy of this file
+  # with SLEEPNET_DEFAULT_BRANCH set to itself.
+  SLEEPNET_DEFAULT_BRANCH="main"
+  BRANCH="${SLEEPNET_BRANCH:-$SLEEPNET_DEFAULT_BRANCH}"
+  [[ "$BRANCH" != "main" ]] && say "installer branch: $BRANCH"
+
+  BOOTSTRAP_DIR="${TMPDIR:-/tmp}/sleepmag-installer-${BRANCH//[^A-Za-z0-9._-]/-}"
+  REPO="https://github.com/tooltim/sleepmag-installer-note-beta.git"
+
+  if have git && { [[ "$IS_MAC" != "1" ]] || mac_git_works; }; then
+    if [[ ! -d "$BOOTSTRAP_DIR/.git" ]]; then
+      rm -rf "$BOOTSTRAP_DIR"
+      git clone -q --branch "$BRANCH" --single-branch "$REPO" "$BOOTSTRAP_DIR"
+    else
+      git -C "$BOOTSTRAP_DIR" fetch -q origin "$BRANCH" || true
+      git -C "$BOOTSTRAP_DIR" checkout -q -B "$BRANCH" "origin/$BRANCH" || true
+    fi
+  else
+    say "Git not found — downloading bootstrap zip…"
+    ZIP="${TMPDIR:-/tmp}/sleepmag-installer-note-beta.zip"
+    EXTRACT_ROOT="${TMPDIR:-/tmp}/sleepmag-installer-note-beta-extract"
+    curl -fsSL -o "$ZIP" "https://github.com/tooltim/sleepmag-installer-note-beta/archive/refs/heads/${BRANCH}.zip"
+    rm -rf "$BOOTSTRAP_DIR" "$EXTRACT_ROOT"
+    mkdir -p "$EXTRACT_ROOT"
+    unzip -q "$ZIP" -d "$EXTRACT_ROOT"
+    EXTRACTED="$(find "$EXTRACT_ROOT" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+    if [[ -z "$EXTRACTED" ]]; then
+      say "Zip extract failed under $EXTRACT_ROOT"
+      exit 1
+    fi
+    mv "$EXTRACTED" "$BOOTSTRAP_DIR"
+    rm -rf "$EXTRACT_ROOT"
+  fi
+
+  ENTRY="$BOOTSTRAP_DIR/bin/install.js"
+  if [[ ! -f "$ENTRY" ]]; then
+    say "Bootstrap entry not found at $ENTRY"
     exit 1
   fi
-  mv "$EXTRACTED" "$BOOTSTRAP_DIR"
-  rm -rf "$EXTRACT_ROOT"
-fi
 
-ENTRY="$BOOTSTRAP_DIR/bin/install.js"
-if [[ ! -f "$ENTRY" ]]; then
-  say "Bootstrap entry not found at $ENTRY"
-  exit 1
-fi
+  ARGS=("$ENTRY")
+  if [[ "${SLEEPNET_MODE:-}" == "check" || "${SLEEPNET_UI:-}" == "0" ]]; then
+    ARGS+=(--cli)
+  else
+    ARGS+=(--ui)
+  fi
 
-ARGS=("$ENTRY")
-if [[ "${SLEEPNET_MODE:-}" == "check" || "${SLEEPNET_UI:-}" == "0" ]]; then
-  ARGS+=(--cli)
-else
-  ARGS+=(--ui)
-fi
+  say "Opening the installer…"
+  exec node "${ARGS[@]}"
+}
 
-say "Opening the installer…"
-exec node "${ARGS[@]}"
+main "$@"
