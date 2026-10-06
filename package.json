@@ -26,6 +26,7 @@
     "scripts",
     "assets",
     "Install-SleepNetwork.cmd",
+    "Install-SleepNetwork.command",
     "README.md",
     "LICENSE"
   ]

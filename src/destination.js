@@ -79,7 +79,35 @@ export function detectCloudSync(p, ctx = {}) {
   for (const pat of CLOUD_PATTERNS) {
     if (pat.re.test(s)) return { id: pat.id, label: pat.label };
   }
+  for (const r of ctx.syncedRoots || []) {
+    if (isInside(r.root, s)) return { id: r.id, label: r.label };
+  }
   return null;
+}
+
+/**
+ * Folders synced without the path saying so. macOS "Desktop & Documents" in
+ * iCloud keeps ~/Documents and ~/Desktop at their usual paths, so the patterns
+ * above never match; the tell is the Documents folder inside iCloud Drive.
+ * Empty on every other platform.
+ *
+ * @param {{ platform?: string, home?: string, env?: Record<string, string|undefined>, iCloudDesktopDocuments?: boolean }} [ctx]
+ * @returns {Array<{ root: string, id: string, label: string }>}
+ */
+export function syncedRoots(ctx = {}) {
+  const platform = ctx.platform || process.platform;
+  if (platform !== 'darwin') return [];
+  const home = ctx.home || platformInfo(platform, ctx.env || process.env).home;
+  const P = path.posix;
+  const on =
+    ctx.iCloudDesktopDocuments ??
+    pathExists(P.join(home, 'Library', 'Mobile Documents', 'com~apple~CloudDocs', 'Documents'));
+  if (!on) return [];
+  return ['Documents', 'Desktop'].map((d) => ({
+    root: P.join(home, d),
+    id: 'icloud',
+    label: 'iCloud Drive (Desktop & Documents)',
+  }));
 }
 
 /** True when `child` is the same as, or below, `parent`. */
@@ -106,6 +134,7 @@ export function destinationCandidates(ctx = {}) {
   const home = ctx.home || info.home;
   const docs = ctx.documentsDir || null;
   const P = pathFor(platform);
+  const synced = syncedRoots({ ...ctx, platform, env, home });
 
   /** @type {Array<{path:string,label:string,note:string,cloud:any,recommended:boolean}>} */
   const out = [];
@@ -116,7 +145,7 @@ export function destinationCandidates(ctx = {}) {
     const key = forCompare(full);
     if (seen.has(key)) return;
     seen.add(key);
-    const cloud = detectCloudSync(full, { env });
+    const cloud = detectCloudSync(full, { env, syncedRoots: synced });
     out.push({
       path: full,
       label,
@@ -254,7 +283,7 @@ export function validateDestination(input, ctx = {}) {
     errors.push('That is a system folder. Pick somewhere under your own user folder.');
   }
 
-  const cloud = detectCloudSync(dest, { env });
+  const cloud = detectCloudSync(dest, { env, syncedRoots: syncedRoots({ ...ctx, platform, env }) });
   if (cloud && !ctx.allowCloud) {
     errors.push(
       `${cloud.label} breaks the workspace: it turns files into placeholders and locks .git while syncing. Pick a local folder instead.`,

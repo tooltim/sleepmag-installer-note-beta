@@ -20,3 +20,33 @@ jobs:
         run: npm test
       - name: Check mode smoke
         run: SLEEPNET_MODE=check node bin/install.js
+
+  # Real macOS: the unit tests, then the actual one-liner bootstrap (install.sh)
+  # in check mode, run from THIS branch so a PR tests its own copy.
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run tests
+        run: npm test
+      - name: install.sh syntax (bash 3.2, the one macOS ships)
+        run: /bin/bash -n scripts/install.sh
+      - name: Bootstrap one-liner, check mode
+        env:
+          SLEEPNET_MODE: check
+          SLEEPNET_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: /bin/bash scripts/install.sh
+
+  # Windows stays the main platform: the same tests on a real Windows runner.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run tests
+        run: npm test

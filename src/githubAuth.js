@@ -122,6 +122,19 @@ function linkGhToGit(gh) {
   }
 }
 
+/**
+ * A Mac has no Git Credential Manager, so GitHub CLI is the only way to sign in.
+ * install.sh already brews it; this covers `npx` / `node bin/install.js` runs.
+ * @returns {string|null}
+ */
+function installGhWithBrew() {
+  const brew = resolveExe('brew');
+  if (!brew) return null;
+  say('installing GitHub CLI (needed to sign in to GitHub on a Mac)…');
+  run(brew, ['install', 'gh'], { timeout: 600_000 });
+  return resolveExe('gh');
+}
+
 function hasGcm(git) {
   return run(git, ['credential-manager', '--version'], { timeout: 15_000 }).code === 0;
 }
@@ -159,7 +172,8 @@ export async function ensureGitHubAccess(opts) {
   }
 
   // probe.kind === 'signin'
-  const gh = resolveExe('gh');
+  let gh = resolveExe('gh');
+  if (!gh && platformInfo().isMac && !hasGcm(git)) gh = installGhWithBrew();
   if (gh) {
     linkGhToGit(gh);
     probe = probeAccess(git, repo);

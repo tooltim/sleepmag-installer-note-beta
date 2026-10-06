@@ -23,11 +23,21 @@ Or from PowerShell:
 irm https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/main/scripts/bootstrap.ps1 | iex
 ```
 
-### macOS (Terminal)
+### macOS
+
+Download [`Install-SleepNetwork.command`](https://github.com/tooltim/sleepmag-installer-note-beta/raw/main/Install-SleepNetwork.command),
+then **right-click → Open** (a plain double-click is blocked the first time, because macOS does not
+run downloaded scripts). Or paste this in Terminal:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/main/scripts/install.sh | bash
 ```
+
+On a fresh Mac it installs **Homebrew** first (it asks for your Mac password once), then Node, Git
+and GitHub CLI (the Mac has no Git Credential Manager, so GitHub sign-in goes through `gh`). It adds
+Homebrew and the workspace to `~/.zprofile`, so `sleepmag` works in any new Terminal window. If
+iCloud syncs your Desktop & Documents, the workspace goes to `~/sleep-network` instead of
+`~/Documents`.
 
 ### Linux (best-effort)
 
