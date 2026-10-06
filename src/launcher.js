@@ -488,26 +488,43 @@ export function macPathLine(dest) {
   return `export PATH=${shellQuote(dest)}:"$PATH"`;
 }
 
+/** Where native installers (Claude Code's among them) put their commands. */
+export const MAC_LOCAL_BIN_LINE = 'export PATH="$HOME/.local/bin:$PATH"';
+
+/**
+ * The login profile new Terminal windows read: ~/.zprofile for zsh (the macOS
+ * default), ~/.bash_profile for accounts still on bash.
+ * @param {string} home
+ * @param {string} [shell]
+ */
+export function macProfileFile(home, shell = process.env.SHELL || '') {
+  return joinPath(home, /bash$/.test(shell) ? '.bash_profile' : '.zprofile');
+}
+
 /**
  * Windows gets the workspace on PATH from `sleepmag setup`; on a Mac nothing does,
- * so `sleepmag` would only work as ./sleepmag from inside the folder. Append the
- * line to ~/.zprofile (zsh is the macOS default shell) once.
- * @param {{ dest: string, dryRun?: boolean, home?: string }} opts
+ * so `sleepmag` would only work as ./sleepmag from inside the folder. And the
+ * Claude Code installer puts `claude` in ~/.local/bin without adding it to PATH,
+ * so a session Terminal opened by the launcher would not find it. Append both
+ * lines to the login profile, each once.
+ * @param {{ dest: string, dryRun?: boolean, home?: string, shell?: string }} opts
  * @returns {{ file: string, changed: boolean }}
  */
 export function ensureMacShellPath(opts) {
   const home = opts.home || platformInfo().home;
-  const file = joinPath(home, '.zprofile');
-  const line = macPathLine(opts.dest);
+  const file = macProfileFile(home, opts.shell);
   let current = '';
   try {
     current = fs.readFileSync(file, 'utf8');
   } catch {
     /* no profile yet */
   }
-  if (current.split(/\r?\n/).includes(line)) return { file, changed: false };
+  const have = new Set(current.split(/\r?\n/).map((l) => l.trim()));
+  const missing = [MAC_LOCAL_BIN_LINE, macPathLine(opts.dest)].filter((l) => !have.has(l));
+  if (!missing.length) return { file, changed: false };
   if (opts.dryRun) return { file, changed: true };
-  fs.appendFileSync(file, `\n# Sleep Network: the sleepmag command\n${line}\n`, 'utf8');
+  const block = ['', '# Sleep Network: the sleepmag and claude commands', ...missing, ''].join('\n');
+  fs.appendFileSync(file, block, 'utf8');
   return { file, changed: true };
 }
 

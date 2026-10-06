@@ -7,6 +7,8 @@ import {
   macCommandScript,
   macPathLine,
   ensureMacShellPath,
+  macProfileFile,
+  MAC_LOCAL_BIN_LINE,
   opensAsApp,
 } from '../src/launcher.js';
 import {
@@ -62,24 +64,44 @@ describe('macOS PATH for sleepmag', () => {
     fs.writeFileSync(path.join(home, '.zprofile'), 'eval "$(/opt/homebrew/bin/brew shellenv)"\n');
     const dest = '/Users/ina/sleep-network';
 
-    const first = ensureMacShellPath({ dest, home });
+    const first = ensureMacShellPath({ dest, home, shell: '/bin/zsh' });
     assert.equal(first.changed, true);
-    const second = ensureMacShellPath({ dest, home });
+    const second = ensureMacShellPath({ dest, home, shell: '/bin/zsh' });
     assert.equal(second.changed, false);
 
     const body = fs.readFileSync(path.join(home, '.zprofile'), 'utf8');
     assert.equal(body.split(macPathLine(dest)).length - 1, 1, 'line written exactly once');
+    assert.equal(body.split(MAC_LOCAL_BIN_LINE).length - 1, 1, '~/.local/bin (claude) written exactly once');
     assert.ok(body.startsWith('eval "$(/opt/homebrew/bin/brew shellenv)"'), 'existing profile kept');
   });
 
   it('creates ~/.zprofile when there is none, and writes nothing in dry-run', () => {
     const home = path.join(tmpRoot, 'home-new');
     fs.mkdirSync(home, { recursive: true });
-    const dry = ensureMacShellPath({ dest: '/x/sleep-network', home, dryRun: true });
+    const dry = ensureMacShellPath({ dest: '/x/sleep-network', home, shell: '/bin/zsh', dryRun: true });
     assert.equal(dry.changed, true);
     assert.equal(fs.existsSync(path.join(home, '.zprofile')), false);
-    ensureMacShellPath({ dest: '/x/sleep-network', home });
+    ensureMacShellPath({ dest: '/x/sleep-network', home, shell: '/bin/zsh' });
     assert.ok(fs.readFileSync(path.join(home, '.zprofile'), 'utf8').includes("export PATH='/x/sleep-network'"));
+  });
+});
+
+describe('macOS login profile', () => {
+  it('is ~/.zprofile for zsh (the default) and ~/.bash_profile for bash accounts', () => {
+    assert.equal(macProfileFile('/Users/ina', '/bin/zsh'), path.join('/Users/ina', '.zprofile'));
+    assert.equal(macProfileFile('/Users/ina', ''), path.join('/Users/ina', '.zprofile'));
+    assert.equal(macProfileFile('/Users/ina', '/bin/bash'), path.join('/Users/ina', '.bash_profile'));
+  });
+
+  it('adds only the line that is missing', () => {
+    const home = path.join(tmpRoot, 'home-partial');
+    fs.mkdirSync(home, { recursive: true });
+    fs.writeFileSync(path.join(home, '.bash_profile'), `${MAC_LOCAL_BIN_LINE}\n`);
+    ensureMacShellPath({ dest: '/y/sleep-network', home, shell: '/bin/bash' });
+    const body = fs.readFileSync(path.join(home, '.bash_profile'), 'utf8');
+    assert.equal(body.split(MAC_LOCAL_BIN_LINE).length - 1, 1);
+    assert.ok(body.includes(macPathLine('/y/sleep-network')));
+    assert.equal(fs.existsSync(path.join(home, '.zprofile')), false);
   });
 });
 

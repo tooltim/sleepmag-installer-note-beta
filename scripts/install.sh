@@ -14,6 +14,10 @@ echo ""
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# A terminal we can really talk to. `-r /dev/tty` is not enough: it is true in CI
+# and under launchd, where opening it still fails.
+has_tty() { { : </dev/tty; } 2>/dev/null; }
+
 IS_MAC=0
 [[ "$(uname -s)" == "Darwin" ]] && IS_MAC=1
 
@@ -32,6 +36,47 @@ mac_git_works() {
   xcode-select -p >/dev/null 2>&1
 }
 
+# The profile a new Terminal window reads: zsh is the macOS default, older
+# accounts can still be on bash.
+login_profile() {
+  case "${SHELL:-}" in
+    */bash) echo "$HOME/.bash_profile" ;;
+    *) echo "$HOME/.zprofile" ;;
+  esac
+}
+
+# Sign in to GitHub right here, in the Terminal the person is already looking at,
+# instead of a second window opened later by the background installer. Skipped in
+# check mode, when there is no terminal, and when git can already read the repo.
+mac_github_signin() {
+  [[ "${SLEEPNET_MODE:-}" == "check" ]] && return 0
+  has_tty || return 0
+  have gh || return 0
+  local repo="https://github.com/tooltim/sleep-network.git"
+  if GIT_TERMINAL_PROMPT=0 git ls-remote --heads "$repo" >/dev/null 2>&1; then
+    ok "GitHub access already works"
+    return 0
+  fi
+  if ! gh auth status --hostname github.com >/dev/null 2>&1; then
+    echo ""
+    say "Sign in to GitHub with the account Tim invited:"
+    say "press Enter when asked, copy the code shown, paste it in the browser page, approve."
+    echo ""
+    gh auth login --hostname github.com --git-protocol https --web </dev/tty || {
+      say "GitHub sign-in did not finish; the installer will offer it again."
+      return 0
+    }
+  fi
+  gh auth setup-git --hostname github.com >/dev/null 2>&1 || true
+  if GIT_TERMINAL_PROMPT=0 git ls-remote --heads "$repo" >/dev/null 2>&1; then
+    ok "GitHub access confirmed"
+  else
+    say "Signed in, but this GitHub account cannot read tooltim/sleep-network yet."
+    say "Accept Tim's invite at https://github.com/tooltim/sleep-network/invitations, then continue."
+  fi
+  return 0
+}
+
 ensure_brew() {
   local b
   b="$(brew_bin)"
@@ -39,7 +84,7 @@ ensure_brew() {
     say "Homebrew not found — installing it (it asks for your Mac password once)…"
     # Piped through curl | bash, our stdin is the script: hand Homebrew the real
     # terminal so it can ask for the password instead of failing non-interactive.
-    if [[ -r /dev/tty ]]; then
+    if has_tty; then
       /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/tty
     else
       /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -53,10 +98,14 @@ ensure_brew() {
   eval "$("$b" shellenv)"
   # New Terminal windows (and the desktop launcher) must find brew, node and git too.
   local line="eval \"\$($b shellenv)\""
-  local profile="$HOME/.zprofile"
+  local profile
+  profile="$(login_profile)"
   if ! grep -qsF "$line" "$profile"; then
-    printf '\n# Homebrew (added by the Sleep Network installer)\n%s\n' "$line" >>"$profile"
-    ok "Homebrew added to $profile"
+    if printf '\n# Homebrew (added by the Sleep Network installer)\n%s\n' "$line" >>"$profile"; then
+      ok "Homebrew added to $profile"
+    else
+      say "could not write $profile; new Terminal windows will not find brew until you add: $line"
+    fi
   fi
   ok "brew $("$b" --version | head -n 1 | awk '{print $2}')"
 }
@@ -106,6 +155,9 @@ if [[ "$IS_MAC" == "1" ]]; then
   ensure_mac_tools
 fi
 ensure_node
+if [[ "$IS_MAC" == "1" ]]; then
+  mac_github_signin
+fi
 
 # Which branch of the installer to run; a test branch ships a copy of this file
 # with SLEEPNET_DEFAULT_BRANCH set to itself.

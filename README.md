@@ -25,17 +25,18 @@ irm https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/main/
 
 ### macOS
 
-Download [`Install-SleepNetwork.command`](https://github.com/tooltim/sleepmag-installer-note-beta/raw/main/Install-SleepNetwork.command),
-then **right-click → Open** (a plain double-click is blocked the first time, because macOS does not
-run downloaded scripts). Or paste this in Terminal:
+Open **Terminal** (Cmd+Space, type Terminal) and paste:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/main/scripts/install.sh | bash
 ```
 
 On a fresh Mac it installs **Homebrew** first (it asks for your Mac password once), then Node, Git
-and GitHub CLI (the Mac has no Git Credential Manager, so GitHub sign-in goes through `gh`). It adds
-Homebrew and the workspace to `~/.zprofile`, so `sleepmag` works in any new Terminal window. If
+and GitHub CLI, then signs you in to GitHub right in that Terminal (press Enter, paste the code in the
+browser page, approve). It adds Homebrew, `~/.local/bin` (where `claude` lives) and the workspace to
+`~/.zprofile` (`~/.bash_profile` on a bash account), so `sleepmag` and `claude` work in any new
+Terminal window. There is deliberately no double-click `.command` installer: a downloaded script loses
+its execute bit and recent macOS blocks unsigned scripts. If
 iCloud syncs your Desktop & Documents, the workspace goes to `~/sleep-network` instead of
 `~/Documents`.
 

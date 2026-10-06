@@ -198,6 +198,9 @@ export async function ensureGitHubAccess(opts) {
   say('You are not signed in to GitHub on this computer yet.');
   say(`Opening a "Sign in to GitHub" window (${signIn.tool}). If you do not see it, check the taskbar.`);
   say('Sign in with the GitHub account Tim invited, then come back here: the install continues by itself.');
+  if (platformInfo().isMac) {
+    say('In that Terminal window: press Enter, copy the code it shows, paste it in the GitHub page, approve.');
+  }
   spawn(signIn.cmd, signIn.args, {
     detached: true,
     stdio: 'ignore',
