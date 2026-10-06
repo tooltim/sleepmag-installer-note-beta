@@ -38,9 +38,21 @@ mac_git_works() {
 
 # The profile a new Terminal window reads: zsh is the macOS default, older
 # accounts can still be on bash.
+# Login bash reads only the FIRST of .bash_profile / .bash_login / .profile, so
+# write to the one it already reads: creating .bash_profile next to an existing
+# .profile would silently switch that .profile off.
 login_profile() {
   case "${SHELL:-}" in
-    */bash) echo "$HOME/.bash_profile" ;;
+    */bash)
+      local f
+      for f in .bash_profile .bash_login .profile; do
+        if [[ -f "$HOME/$f" ]]; then
+          echo "$HOME/$f"
+          return 0
+        fi
+      done
+      echo "$HOME/.bash_profile"
+      ;;
     *) echo "$HOME/.zprofile" ;;
   esac
 }
@@ -84,14 +96,19 @@ ensure_brew() {
     say "Homebrew not found — installing it (it asks for your Mac password once)…"
     # Piped through curl | bash, our stdin is the script: hand Homebrew the real
     # terminal so it can ask for the password instead of failing non-interactive.
+    # `|| true`: under set -e a failed Homebrew install would end this script with
+    # only Homebrew's own error; the brew_bin check below says what to do instead.
     if has_tty; then
-      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/tty
+      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/tty || true
     else
-      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      # No terminal: never let Homebrew read the rest of THIS script from the pipe.
+      NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/null || true
     fi
     b="$(brew_bin)"
     if [[ -z "$b" ]]; then
-      say "Homebrew did not install. Install it from https://brew.sh, then re-run this command."
+      say "Homebrew did not install."
+      say "If it said \"Need sudo access\", this Mac account is not an administrator: log in with an admin account (or ask for admin rights) and re-run."
+      say "Otherwise install it from https://brew.sh, then re-run this command."
       exit 1
     fi
   fi
@@ -100,7 +117,8 @@ ensure_brew() {
   local line="eval \"\$($b shellenv)\""
   local profile
   profile="$(login_profile)"
-  if ! grep -qsF "$line" "$profile"; then
+  # -x: the whole line, so a commented-out copy does not count as present.
+  if ! grep -qsxF "$line" "$profile"; then
     if printf '\n# Homebrew (added by the Sleep Network installer)\n%s\n' "$line" >>"$profile"; then
       ok "Homebrew added to $profile"
     else

@@ -314,9 +314,12 @@ $sc.Save()
  */
 export function openInstalled(launcher, opts = {}) {
   const fallbackPath = launcher?.target || launcher?.path || '';
-  const howTo = fallbackPath
+  let howTo = fallbackPath
     ? `Double-click '${LAUNCHER_NAME}' on your desktop, or run ${fallbackPath}`
     : `Double-click '${LAUNCHER_NAME}' on your desktop`;
+  // macOS without a Desktop .command: there is nothing to double-click, and the
+  // launcher's hint already says how to start it.
+  if (process.platform === 'darwin' && !launcher?.path && launcher?.hint) howTo = launcher.hint;
 
   if (opts.dryRun) {
     say('[dry-run] would open Sleep Network Launcher');
@@ -448,12 +451,21 @@ function ensureMacLauncher(opts) {
     say(`could not add sleepmag to PATH (${e.message || e}); run ./sleepmag from ${opts.dest} instead`);
   }
 
+  // Writing to ~/Desktop raises macOS's "Terminal would like to access files in
+  // your Desktop folder" prompt; "Don't Allow" leaves no launcher. Say so plainly
+  // instead of ending on "Installed" with nothing to double-click.
+  const created = pathExists(commandPath);
+  const noLauncherHint =
+    `Installed, but there is no Desktop launcher (macOS did not allow writing to the Desktop). ` +
+    `Start it from a NEW Terminal window with:  sleepmag ui   (or: node ${shellQuote(cli)})`;
+  if (!created) say(noLauncherHint);
+
   return {
     kind: 'command',
-    path: pathExists(commandPath) ? commandPath : null,
+    path: created ? commandPath : null,
     target: cli,
-    hint,
-    shortcuts: pathExists(commandPath) ? [commandPath] : [],
+    hint: created ? hint : noLauncherHint,
+    shortcuts: created ? [commandPath] : [],
   };
 }
 
@@ -493,12 +505,19 @@ export const MAC_LOCAL_BIN_LINE = 'export PATH="$HOME/.local/bin:$PATH"';
 
 /**
  * The login profile new Terminal windows read: ~/.zprofile for zsh (the macOS
- * default), ~/.bash_profile for accounts still on bash.
+ * default). Login bash reads only the FIRST of .bash_profile / .bash_login /
+ * .profile, so a bash account gets the one it already reads: creating
+ * .bash_profile next to an existing .profile would switch that .profile off.
  * @param {string} home
  * @param {string} [shell]
  */
 export function macProfileFile(home, shell = process.env.SHELL || '') {
-  return joinPath(home, /bash$/.test(shell) ? '.bash_profile' : '.zprofile');
+  if (!/bash$/.test(shell)) return joinPath(home, '.zprofile');
+  for (const f of ['.bash_profile', '.bash_login', '.profile']) {
+    const p = joinPath(home, f);
+    if (pathExists(p)) return p;
+  }
+  return joinPath(home, '.bash_profile');
 }
 
 /**

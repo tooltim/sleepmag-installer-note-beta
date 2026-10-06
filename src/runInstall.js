@@ -138,7 +138,7 @@ export async function runInstall(options = {}) {
     }
     const dest = destCheck.dest;
     say(`Install folder: ${dest}`);
-    if (destCheck.cloud) {
+    if (destCheck.cloud && !destCheck.cloud.soft) {
       say(`WARNING: ${destCheck.cloud.label} syncs this folder — you chose to continue anyway.`);
     }
 

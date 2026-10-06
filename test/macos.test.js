@@ -93,6 +93,18 @@ describe('macOS login profile', () => {
     assert.equal(macProfileFile('/Users/ina', '/bin/bash'), path.join('/Users/ina', '.bash_profile'));
   });
 
+  it('on bash, writes to the profile bash already reads and never creates .bash_profile next to .profile', () => {
+    const home = path.join(tmpRoot, 'home-dotprofile');
+    fs.mkdirSync(home, { recursive: true });
+    fs.writeFileSync(path.join(home, '.profile'), 'export EDITOR=vim\n');
+    assert.equal(macProfileFile(home, '/bin/bash'), path.join(home, '.profile'));
+    ensureMacShellPath({ dest: '/z/sleep-network', home, shell: '/bin/bash' });
+    assert.equal(fs.existsSync(path.join(home, '.bash_profile')), false);
+    const body = fs.readFileSync(path.join(home, '.profile'), 'utf8');
+    assert.ok(body.startsWith('export EDITOR=vim'));
+    assert.ok(body.includes(MAC_LOCAL_BIN_LINE));
+  });
+
   it('adds only the line that is missing', () => {
     const home = path.join(tmpRoot, 'home-partial');
     fs.mkdirSync(home, { recursive: true });
@@ -137,32 +149,73 @@ describe('iCloud Desktop & Documents', () => {
     assert.deepEqual(syncedRoots({ platform: 'linux', home: '/home/ina', iCloudDesktopDocuments: true }), []);
   });
 
-  it('defaults to the home folder and refuses synced Documents', () => {
-    const ctx = {
-      platform: 'darwin',
-      home,
-      env: {},
-      documentsDir: '/Users/ina/Documents',
-      iCloudDesktopDocuments: true,
-      probe: false,
-    };
-    assert.equal(validateDestination(null, ctx).dest, '/Users/ina/sleep-network');
+  const macCtx = (extra) => ({
+    platform: 'darwin',
+    home,
+    env: {},
+    documentsDir: '/Users/ina/Documents',
+    existingInstalls: [],
+    probe: false,
+    ...extra,
+  });
+
+  it('warns about Documents but never refuses it (the iCloud tell can be stale)', () => {
+    const ctx = macCtx({ iCloudDesktopDocuments: true });
     const synced = validateDestination('/Users/ina/Documents', ctx);
-    assert.equal(synced.ok, false);
-    assert.match(synced.errors.join(' '), /iCloud/);
+    assert.equal(synced.ok, true);
+    assert.deepEqual(synced.errors, []);
+    assert.match(synced.warnings.join(' '), /iCloud/);
     const docs = destinationCandidates(ctx).find((c) => c.label === 'Documents');
     assert.equal(docs?.cloud?.id, 'icloud');
   });
 
-  it('keeps Documents as the default on a Mac without it', () => {
-    const ctx = {
-      platform: 'darwin',
-      home,
-      env: {},
-      documentsDir: '/Users/ina/Documents',
-      iCloudDesktopDocuments: false,
-      probe: false,
-    };
+  it('still refuses a folder that is plainly inside iCloud Drive', () => {
+    const r = validateDestination(
+      '/Users/ina/Library/Mobile Documents/com~apple~CloudDocs/sleep-network',
+      macCtx({ iCloudDesktopDocuments: false }),
+    );
+    assert.equal(r.ok, false);
+  });
+});
+
+describe('default folder on a Mac', () => {
+  const home = '/Users/ina';
+  const macCtx = (extra) => ({
+    platform: 'darwin',
+    home,
+    env: {},
+    documentsDir: '/Users/ina/Documents',
+    existingInstalls: [],
+    probe: false,
+    ...extra,
+  });
+
+  it('is the home folder, with or without iCloud', () => {
+    for (const iCloudDesktopDocuments of [true, false]) {
+      const ctx = macCtx({ iCloudDesktopDocuments });
+      assert.equal(validateDestination(null, ctx).dest, '/Users/ina/sleep-network');
+      const rec = destinationCandidates(ctx).filter((c) => c.recommended);
+      assert.equal(rec.length, 1);
+      assert.equal(rec[0].label, 'Home folder');
+    }
+  });
+
+  it('keeps an existing install in Documents where it is', () => {
+    const ctx = macCtx({
+      iCloudDesktopDocuments: true,
+      existingInstalls: ['/Users/ina/Documents/sleep-network'],
+    });
     assert.equal(validateDestination(null, ctx).dest, '/Users/ina/Documents/sleep-network');
+  });
+
+  it('leaves Windows exactly as before (Documents first)', () => {
+    const r = validateDestination(null, {
+      platform: 'win32',
+      home: 'C:\\Users\\ina',
+      env: {},
+      documentsDir: 'C:\\Users\\ina\\Documents',
+      probe: false,
+    });
+    assert.equal(r.dest, 'C:\\Users\\ina\\Documents\\sleep-network');
   });
 });

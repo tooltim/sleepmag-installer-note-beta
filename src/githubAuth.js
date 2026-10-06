@@ -140,6 +140,15 @@ function hasGcm(git) {
 }
 
 function noAccessError(output) {
+  if (platformInfo().isMac) {
+    return new Error(
+      'You are signed in to GitHub, but that account cannot read tooltim/sleep-network. ' +
+        'Either the invite is not accepted yet (open https://github.com/tooltim/sleep-network/invitations), ' +
+        'or this Mac is signed in with a different GitHub account: run `gh auth logout`, then `gh auth login` ' +
+        'with the account Tim invited, then run the installer again.\n' +
+        output,
+    );
+  }
   return new Error(
     'You are signed in to GitHub, but that account cannot read tooltim/sleep-network. ' +
       'Either the invite is not accepted yet (open https://github.com/tooltim/sleep-network/invitations), ' +

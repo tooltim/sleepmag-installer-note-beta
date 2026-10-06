@@ -36,9 +36,10 @@ and GitHub CLI, then signs you in to GitHub right in that Terminal (press Enter,
 browser page, approve). It adds Homebrew, `~/.local/bin` (where `claude` lives) and the workspace to
 `~/.zprofile` (`~/.bash_profile` on a bash account), so `sleepmag` and `claude` work in any new
 Terminal window. There is deliberately no double-click `.command` installer: a downloaded script loses
-its execute bit and recent macOS blocks unsigned scripts. If
-iCloud syncs your Desktop & Documents, the workspace goes to `~/sleep-network` instead of
-`~/Documents`.
+its execute bit and recent macOS blocks unsigned scripts. On a Mac the
+workspace goes to `~/sleep-network` by default, not `~/Documents` (no "access your Documents
+folder" prompt, never in iCloud); an install already in `~/Documents` stays where it is. macOS
+may ask once whether Terminal can write to your Desktop (for the launcher icon): say OK.
 
 ### Linux (best-effort)
 
