@@ -79,7 +79,37 @@ export function detectCloudSync(p, ctx = {}) {
   for (const pat of CLOUD_PATTERNS) {
     if (pat.re.test(s)) return { id: pat.id, label: pat.label };
   }
+  for (const r of ctx.syncedRoots || []) {
+    if (isInside(r.root, s)) return { id: r.id, label: r.label, soft: true };
+  }
   return null;
+}
+
+/**
+ * Folders that MAY be synced without the path saying so. macOS "Desktop &
+ * Documents" in iCloud keeps ~/Documents and ~/Desktop at their usual paths, so
+ * the patterns above never match; the tell is the Documents folder inside iCloud
+ * Drive. That folder stays behind when the option is turned off again, so the
+ * match is "soft": it steers the default and warns, it never refuses.
+ * Empty on every other platform.
+ *
+ * @param {{ platform?: string, home?: string, env?: Record<string, string|undefined>, iCloudDesktopDocuments?: boolean }} [ctx]
+ * @returns {Array<{ root: string, id: string, label: string }>}
+ */
+export function syncedRoots(ctx = {}) {
+  const platform = ctx.platform || process.platform;
+  if (platform !== 'darwin') return [];
+  const home = ctx.home || platformInfo(platform, ctx.env || process.env).home;
+  const P = path.posix;
+  const on =
+    ctx.iCloudDesktopDocuments ??
+    pathExists(P.join(home, 'Library', 'Mobile Documents', 'com~apple~CloudDocs', 'Documents'));
+  if (!on) return [];
+  return ['Documents', 'Desktop'].map((d) => ({
+    root: P.join(home, d),
+    id: 'icloud',
+    label: 'iCloud Drive (Desktop & Documents, if turned on)',
+  }));
 }
 
 /** True when `child` is the same as, or below, `parent`. */
@@ -106,6 +136,14 @@ export function destinationCandidates(ctx = {}) {
   const home = ctx.home || info.home;
   const docs = ctx.documentsDir || null;
   const P = pathFor(platform);
+  const synced = syncedRoots({ ...ctx, platform, env, home });
+  const hasInstall = (dir) => {
+    const full = P.join(dir, WORKSPACE_NAME);
+    if (Array.isArray(ctx.existingInstalls)) {
+      return ctx.existingInstalls.some((e) => forCompare(e) === forCompare(full));
+    }
+    return pathExists(P.join(full, '.git'));
+  };
 
   /** @type {Array<{path:string,label:string,note:string,cloud:any,recommended:boolean}>} */
   const out = [];
@@ -116,7 +154,7 @@ export function destinationCandidates(ctx = {}) {
     const key = forCompare(full);
     if (seen.has(key)) return;
     seen.add(key);
-    const cloud = detectCloudSync(full, { env });
+    const cloud = detectCloudSync(full, { env, syncedRoots: synced });
     out.push({
       path: full,
       label,
@@ -126,13 +164,22 @@ export function destinationCandidates(ctx = {}) {
     });
   };
 
-  if (docs) push(docs, 'Documents', 'your usual Documents folder');
-  if (platform === 'win32') {
-    push(P.join(home, 'Documents'), 'Local Documents', 'the real Documents folder on this PC');
+  if (platform === 'darwin') {
+    // Home first on a Mac: ~/Documents raises the "Terminal would like to access
+    // your Documents folder" prompt and may be in iCloud. An install that is
+    // already in Documents stays where it is.
+    if (docs && hasInstall(docs)) push(docs, 'Documents', 'your existing install');
+    push(home, 'Home folder', 'always local, never cloud-synced');
+    if (docs) push(docs, 'Documents', 'your usual Documents folder');
+  } else {
+    if (docs) push(docs, 'Documents', 'your usual Documents folder');
+    if (platform === 'win32') {
+      push(P.join(home, 'Documents'), 'Local Documents', 'the real Documents folder on this PC');
+    }
+    push(home, 'Home folder', 'always local, never cloud-synced');
   }
-  push(home, 'Home folder', 'always local, never cloud-synced');
 
-  const firstLocal = out.find((c) => !c.cloud);
+  const firstLocal = out.find((c) => !c.cloud || c.cloud.soft);
   if (firstLocal) firstLocal.recommended = true;
   else if (out.length) out[0].recommended = true;
 
@@ -146,9 +193,8 @@ export function destinationCandidates(ctx = {}) {
  */
 export function defaultDestination(ctx = {}) {
   const candidates = destinationCandidates(ctx);
-  const local = candidates.find((c) => !c.cloud);
-  if (local) return local.path;
-  if (candidates.length) return candidates[0].path;
+  const recommended = candidates.find((c) => c.recommended);
+  if (recommended) return recommended.path;
   const platform = ctx.platform || process.platform;
   const info = platformInfo(platform, ctx.env || process.env);
   return pathFor(platform).join(ctx.home || info.home, WORKSPACE_NAME);
@@ -254,8 +300,12 @@ export function validateDestination(input, ctx = {}) {
     errors.push('That is a system folder. Pick somewhere under your own user folder.');
   }
 
-  const cloud = detectCloudSync(dest, { env });
-  if (cloud && !ctx.allowCloud) {
+  const cloud = detectCloudSync(dest, { env, syncedRoots: syncedRoots({ ...ctx, platform, env }) });
+  if (cloud && cloud.soft) {
+    warnings.push(
+      `If ${cloud.label.replace(/, if turned on\)$/, ')')} is turned on for this Mac, git can hang in this folder; ~/${WORKSPACE_NAME} is the safe choice.`,
+    );
+  } else if (cloud && !ctx.allowCloud) {
     errors.push(
       `${cloud.label} breaks the workspace: it turns files into placeholders and locks .git while syncing. Pick a local folder instead.`,
     );

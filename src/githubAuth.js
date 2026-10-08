@@ -122,11 +122,33 @@ function linkGhToGit(gh) {
   }
 }
 
+/**
+ * A Mac has no Git Credential Manager, so GitHub CLI is the only way to sign in.
+ * install.sh already brews it; this covers `npx` / `node bin/install.js` runs.
+ * @returns {string|null}
+ */
+function installGhWithBrew() {
+  const brew = resolveExe('brew');
+  if (!brew) return null;
+  say('installing GitHub CLI (needed to sign in to GitHub on a Mac)…');
+  run(brew, ['install', 'gh'], { timeout: 600_000 });
+  return resolveExe('gh');
+}
+
 function hasGcm(git) {
   return run(git, ['credential-manager', '--version'], { timeout: 15_000 }).code === 0;
 }
 
 function noAccessError(output) {
+  if (platformInfo().isMac) {
+    return new Error(
+      'You are signed in to GitHub, but that account cannot read tooltim/sleep-network. ' +
+        'Either the invite is not accepted yet (open https://github.com/tooltim/sleep-network/invitations), ' +
+        'or this Mac is signed in with a different GitHub account: run `gh auth logout`, then `gh auth login` ' +
+        'with the account Tim invited, then run the installer again.\n' +
+        output,
+    );
+  }
   return new Error(
     'You are signed in to GitHub, but that account cannot read tooltim/sleep-network. ' +
       'Either the invite is not accepted yet (open https://github.com/tooltim/sleep-network/invitations), ' +
@@ -159,7 +181,8 @@ export async function ensureGitHubAccess(opts) {
   }
 
   // probe.kind === 'signin'
-  const gh = resolveExe('gh');
+  let gh = resolveExe('gh');
+  if (!gh && platformInfo().isMac && !hasGcm(git)) gh = installGhWithBrew();
   if (gh) {
     linkGhToGit(gh);
     probe = probeAccess(git, repo);
@@ -184,6 +207,9 @@ export async function ensureGitHubAccess(opts) {
   say('You are not signed in to GitHub on this computer yet.');
   say(`Opening a "Sign in to GitHub" window (${signIn.tool}). If you do not see it, check the taskbar.`);
   say('Sign in with the GitHub account Tim invited, then come back here: the install continues by itself.');
+  if (platformInfo().isMac) {
+    say('In that Terminal window: press Enter, copy the code it shows, paste it in the GitHub page, approve.');
+  }
   spawn(signIn.cmd, signIn.args, {
     detached: true,
     stdio: 'ignore',

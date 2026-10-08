@@ -14,7 +14,10 @@ import { resolveIcon, isUsableIcon } from '../src/launcher.js';
 let tmpRoot;
 
 before(() => {
-  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sleepnet-cleanup-'));
+  // macOS keeps TMPDIR under /var/folders, which the delete guard rightly calls a
+  // system location; a real workspace lives under the home folder, so test there.
+  const base = process.platform === 'darwin' ? os.homedir() : os.tmpdir();
+  tmpRoot = fs.mkdtempSync(path.join(base, 'sleepnet-cleanup-'));
 });
 
 after(() => {

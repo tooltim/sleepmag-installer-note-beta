@@ -314,9 +314,12 @@ $sc.Save()
  */
 export function openInstalled(launcher, opts = {}) {
   const fallbackPath = launcher?.target || launcher?.path || '';
-  const howTo = fallbackPath
+  let howTo = fallbackPath
     ? `Double-click '${LAUNCHER_NAME}' on your desktop, or run ${fallbackPath}`
     : `Double-click '${LAUNCHER_NAME}' on your desktop`;
+  // macOS without a Desktop .command: there is nothing to double-click, and the
+  // launcher's hint already says how to start it.
+  if (process.platform === 'darwin' && !launcher?.path && launcher?.hint) howTo = launcher.hint;
 
   if (opts.dryRun) {
     say('[dry-run] would open Sleep Network Launcher');
@@ -325,7 +328,7 @@ export function openInstalled(launcher, opts = {}) {
 
   // Prefer the shortcut (it proves the shortcut itself works); fall back to the stub.
   const candidates = [launcher?.path, launcher?.target].filter(
-    (p) => p && pathExists(p),
+    (p) => p && pathExists(p) && opensAsApp(p),
   );
   if (!candidates.length) {
     say('could not open the launcher automatically: nothing to open');
@@ -342,6 +345,18 @@ export function openInstalled(launcher, opts = {}) {
   }
 
   return { opened: false, evidence: 'every launch attempt failed', howTo };
+}
+
+/**
+ * macOS `open` on a .mjs shows it in a text editor and still exits 0, which
+ * would be reported as "opened". Only the .command really starts the launcher.
+ * Other platforms are unchanged.
+ * @param {string} p
+ * @param {string} [platform]
+ */
+export function opensAsApp(p, platform = process.platform) {
+  if (platform !== 'darwin') return true;
+  return /\.(command|app)$/i.test(String(p));
 }
 
 /**
@@ -399,19 +414,7 @@ function ensureMacLauncher(opts) {
   const desktop = desktopDir(info);
   const commandPath = joinPath(desktop, `${LAUNCHER_NAME}.command`);
   const cli = resolvePosixEntry(opts.dest);
-
-  const script = `#!/bin/bash
-cd ${shellQuote(opts.dest)} || exit 1
-if [[ -f ${shellQuote(cli)} ]]; then
-  exec node ${shellQuote(cli)} "$@"
-elif [[ -x ./sleepmag ]]; then
-  exec ./sleepmag "$@"
-else
-  echo "Sleep Network Launcher not found in ${opts.dest}"
-  read -r -p "Press Enter to close…"
-  exit 1
-fi
-`;
+  const script = macCommandScript(opts.dest, cli);
 
   const hint = `Installed. Double-click '${LAUNCHER_NAME}.command' on your Desktop (right-click → Open the first time if macOS blocks it).`;
 
@@ -440,13 +443,108 @@ fi
     say(`macOS launcher: ${e.message || e}`);
   }
 
+  try {
+    const p = ensureMacShellPath({ dest: opts.dest });
+    if (p.changed) ok(`sleepmag added to your PATH in ${p.file} (open a NEW Terminal window to use it)`);
+    else ok('sleepmag is on your PATH');
+  } catch (e) {
+    say(`could not add sleepmag to PATH (${e.message || e}); run ./sleepmag from ${opts.dest} instead`);
+  }
+
+  // Writing to ~/Desktop raises macOS's "Terminal would like to access files in
+  // your Desktop folder" prompt; "Don't Allow" leaves no launcher. Say so plainly
+  // instead of ending on "Installed" with nothing to double-click.
+  const created = pathExists(commandPath);
+  const noLauncherHint =
+    `Installed, but there is no Desktop launcher (macOS did not allow writing to the Desktop). ` +
+    `Start it from a NEW Terminal window with:  sleepmag ui   (or: node ${shellQuote(cli)})`;
+  if (!created) say(noLauncherHint);
+
   return {
     kind: 'command',
-    path: pathExists(commandPath) ? commandPath : null,
+    path: created ? commandPath : null,
     target: cli,
-    hint,
-    shortcuts: pathExists(commandPath) ? [commandPath] : [],
+    hint: created ? hint : noLauncherHint,
+    shortcuts: created ? [commandPath] : [],
   };
+}
+
+/**
+ * The Desktop .command file. Finder starts it in a fresh Terminal whose PATH may
+ * not have Homebrew yet (no ~/.zprofile line on a Mac set up by hand), so the
+ * usual install dirs go first: without them `node` is "command not found".
+ * @param {string} dest
+ * @param {string} entry — launcher/run.mjs, or cli.mjs when the launcher is missing
+ */
+export function macCommandScript(dest, entry) {
+  return `#!/bin/bash
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+cd ${shellQuote(dest)} || exit 1
+if [[ -f ${shellQuote(entry)} ]]; then
+  exec node ${shellQuote(entry)} "$@"
+elif [[ -x ./sleepmag ]]; then
+  exec ./sleepmag "$@"
+else
+  echo "Sleep Network Launcher not found in ${dest}"
+  read -r -p "Press Enter to close…"
+  exit 1
+fi
+`;
+}
+
+/**
+ * The line that puts the workspace (and so `sleepmag`) on PATH in new Terminal windows.
+ * @param {string} dest
+ */
+export function macPathLine(dest) {
+  return `export PATH=${shellQuote(dest)}:"$PATH"`;
+}
+
+/** Where native installers (Claude Code's among them) put their commands. */
+export const MAC_LOCAL_BIN_LINE = 'export PATH="$HOME/.local/bin:$PATH"';
+
+/**
+ * The login profile new Terminal windows read: ~/.zprofile for zsh (the macOS
+ * default). Login bash reads only the FIRST of .bash_profile / .bash_login /
+ * .profile, so a bash account gets the one it already reads: creating
+ * .bash_profile next to an existing .profile would switch that .profile off.
+ * @param {string} home
+ * @param {string} [shell]
+ */
+export function macProfileFile(home, shell = process.env.SHELL || '') {
+  if (!/bash$/.test(shell)) return joinPath(home, '.zprofile');
+  for (const f of ['.bash_profile', '.bash_login', '.profile']) {
+    const p = joinPath(home, f);
+    if (pathExists(p)) return p;
+  }
+  return joinPath(home, '.bash_profile');
+}
+
+/**
+ * Windows gets the workspace on PATH from `sleepmag setup`; on a Mac nothing does,
+ * so `sleepmag` would only work as ./sleepmag from inside the folder. And the
+ * Claude Code installer puts `claude` in ~/.local/bin without adding it to PATH,
+ * so a session Terminal opened by the launcher would not find it. Append both
+ * lines to the login profile, each once.
+ * @param {{ dest: string, dryRun?: boolean, home?: string, shell?: string }} opts
+ * @returns {{ file: string, changed: boolean }}
+ */
+export function ensureMacShellPath(opts) {
+  const home = opts.home || platformInfo().home;
+  const file = macProfileFile(home, opts.shell);
+  let current = '';
+  try {
+    current = fs.readFileSync(file, 'utf8');
+  } catch {
+    /* no profile yet */
+  }
+  const have = new Set(current.split(/\r?\n/).map((l) => l.trim()));
+  const missing = [MAC_LOCAL_BIN_LINE, macPathLine(opts.dest)].filter((l) => !have.has(l));
+  if (!missing.length) return { file, changed: false };
+  if (opts.dryRun) return { file, changed: true };
+  const block = ['', '# Sleep Network: the sleepmag and claude commands', ...missing, ''].join('\n');
+  fs.appendFileSync(file, block, 'utf8');
+  return { file, changed: true };
 }
 
 function trySetMacIcon(filePath, pngPath) {

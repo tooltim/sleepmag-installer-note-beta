@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { joinPath, pathExists, platformInfo } from './platform.js';
 import { run } from './exec.js';
 import { say } from './say.js';
+import { probeEnv } from './githubAuth.js';
 
 const require = createRequire(import.meta.url);
 
@@ -90,7 +91,12 @@ export async function runSleepmagSetup(opts) {
     return { ok: true, dryRun: true };
   }
 
-  const r = run(opts.nodeExe, [setupCli, ...setupArgs], { timeout: 600_000 });
+  // On a Mac the installer still has Terminal as its controlling tty: if GitHub
+  // refuses the platform clone inside setup, git would ask for a username there
+  // and sit until the timeout while the UI shows "running". Fail fast instead.
+  // Windows keeps its environment as is.
+  const setupEnv = platformInfo().isMac ? probeEnv() : undefined;
+  const r = run(opts.nodeExe, [setupCli, ...setupArgs], { timeout: 600_000, env: setupEnv });
   const setupText = r.combined;
   process.stdout.write(setupText.endsWith('\n') || !setupText ? setupText : setupText + '\n');
 

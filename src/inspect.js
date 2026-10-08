@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { joinPath, pathExists, platformInfo } from './platform.js';
 import { run } from './exec.js';
-import { detectCloudSync } from './destination.js';
+import { detectCloudSync, syncedRoots } from './destination.js';
 
 /** A file smaller than this is treated as empty/truncated, not as installed. */
 const MIN_BYTES = {
@@ -77,7 +77,7 @@ export function inspectInstall(dest, ctx = {}) {
     checks: /** @type {Array<{id:string,label:string,required:boolean,ok:boolean,detail:string}>} */ ([]),
     problems: /** @type {string[]} */ ([]),
     git: { isRepo: false, remote: '', branch: '', commit: '' },
-    cloud: detectCloudSync(dest, { env }),
+    cloud: detectCloudSync(dest, { env, syncedRoots: syncedRoots({ ...ctx, platform, env }) }),
     summary: '',
   };
 
