@@ -1,0 +1,83 @@
+name: E2E install
+
+# The real one-liner, on a clean Windows and a clean macOS VM, all the way through:
+# tools → clean up → download workspace → setup → verify → desktop launcher → open.
+# The real workspace is private, so it clones a stand-in with the same shape
+# (test/e2e/make-fixture.mjs) through SLEEPNET_REPO. Then it runs a second time,
+# like someone re-running the installer, which must update in place.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      SLEEPNET_BRANCH: ${{ github.head_ref || github.ref_name }}
+      SLEEPNET_UI: '0'
+      SLEEPNET_NAME: E2E
+      SLEEPNET_EMAIL: e2e@example.com
+      SLEEPNET_PASSPHRASE: e2e-passphrase-not-real
+      SLEEPNET_ASSISTANT: none
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the stand-in workspace
+        shell: pwsh
+        run: |
+          $url = node test/e2e/make-fixture.mjs "$env:RUNNER_TEMP\fixture"
+          "SLEEPNET_REPO=$url" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "SLEEPNET_DEST=$env:USERPROFILE\sleep-network" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: The one-liner (irm … bootstrap.ps1 | iex), from this commit
+        shell: powershell
+        run: |
+          $sha = '${{ github.event.pull_request.head.sha || github.sha }}'
+          irm "https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/$sha/scripts/bootstrap.ps1" | iex
+          if ($LASTEXITCODE -ne 0) { throw "installer exited $LASTEXITCODE" }
+      - name: Everything is where a person expects it
+        shell: pwsh
+        run: node test/e2e/assert-install.mjs "$env:SLEEPNET_DEST" "$env:SLEEPNET_EMAIL"
+      - name: Second run updates in place
+        shell: powershell
+        run: |
+          Remove-Item "$env:SLEEPNET_DEST\.e2e" -Recurse -Force
+          $sha = '${{ github.event.pull_request.head.sha || github.sha }}'
+          irm "https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/$sha/scripts/bootstrap.ps1" | iex
+          if ($LASTEXITCODE -ne 0) { throw "installer exited $LASTEXITCODE" }
+          node test/e2e/assert-install.mjs "$env:SLEEPNET_DEST" "$env:SLEEPNET_EMAIL"
+          if ($LASTEXITCODE -ne 0) { throw "second run incomplete" }
+      - name: Install log
+        if: always()
+        shell: pwsh
+        run: Get-Content "$env:TEMP\sleepnet-install.log" -ErrorAction SilentlyContinue | Select-Object -Last 80
+
+  macos:
+    runs-on: macos-latest
+    env:
+      SLEEPNET_BRANCH: ${{ github.head_ref || github.ref_name }}
+      SLEEPNET_UI: '0'
+      SLEEPNET_NAME: E2E
+      SLEEPNET_EMAIL: e2e@example.com
+      SLEEPNET_PASSPHRASE: e2e-passphrase-not-real
+      SLEEPNET_ASSISTANT: none
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the stand-in workspace
+        run: |
+          echo "SLEEPNET_REPO=$(node test/e2e/make-fixture.mjs "$RUNNER_TEMP/fixture")" >> "$GITHUB_ENV"
+          echo "SLEEPNET_DEST=$HOME/sleep-network" >> "$GITHUB_ENV"
+      - name: The one-liner (curl … install.sh | bash), from this commit
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/${{ github.event.pull_request.head.sha || github.sha }}/scripts/install.sh" | bash
+      - name: Everything is where a person expects it
+        run: node test/e2e/assert-install.mjs "$SLEEPNET_DEST" "$SLEEPNET_EMAIL"
+      - name: Second run updates in place
+        run: |
+          rm -rf "$SLEEPNET_DEST/.e2e"
+          curl -fsSL "https://raw.githubusercontent.com/tooltim/sleepmag-installer-note-beta/${{ github.event.pull_request.head.sha || github.sha }}/scripts/install.sh" | bash
+          node test/e2e/assert-install.mjs "$SLEEPNET_DEST" "$SLEEPNET_EMAIL"
+      - name: Install log
+        if: always()
+        run: tail -n 80 "${TMPDIR:-/tmp}/sleepnet-install.log" || true

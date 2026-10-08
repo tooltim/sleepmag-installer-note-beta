@@ -29,7 +29,9 @@ export function looksLikeAuthFailure(output) {
 export async function ensureWorkspace(opts) {
   const dest = opts.dest;
   const git = opts.gitExe;
-  const repo = opts.repoUrl || REPO_URL;
+  // SLEEPNET_REPO: the end-to-end CI test installs a stand-in workspace, because
+  // the real one is private. Nobody sets it in a normal install.
+  const repo = opts.repoUrl || process.env.SLEEPNET_REPO || REPO_URL;
   const gitDir = joinPath(dest, '.git');
 
   if (!pathExists(gitDir)) {
