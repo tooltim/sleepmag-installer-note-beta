@@ -70,6 +70,7 @@ export function refreshPath(env = process.env) {
       joinPath(la, 'Programs', 'Python', 'Python312'),
       joinPath(la, 'Microsoft', 'WindowsApps'),
       joinPath(info.home, '.local', 'bin'),
+      joinPath(info.appData || joinPath(info.home, 'AppData', 'Roaming'), 'npm'),
     );
   } else {
     extras.push(
@@ -126,6 +127,16 @@ function knownLocations(name, info) {
   }
   if (name === 'git') {
     return [joinPath(pf, 'Git', 'cmd', 'git.exe'), joinPath(la, 'Programs', 'Git', 'cmd', 'git.exe')];
+  }
+  if (name === 'claude' || name === 'codex' || name === 'gemini') {
+    // Native installer (claude.exe in ~/.local/bin) and npm global (%APPDATA%\npm\<name>.cmd).
+    // Missing these made a working Claude look absent, so the installer reinstalled over it.
+    const npmDir = joinPath(info.appData || joinPath(info.home, 'AppData', 'Roaming'), 'npm');
+    return [
+      joinPath(info.home, '.local', 'bin', `${name}.exe`),
+      joinPath(npmDir, `${name}.cmd`),
+      joinPath(npmDir, `${name}.ps1`),
+    ];
   }
   if (name === 'python' || name === 'python3') {
     return [

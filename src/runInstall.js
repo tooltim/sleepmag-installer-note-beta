@@ -197,6 +197,9 @@ export async function runInstall(options = {}) {
         env,
       });
       state.cleanup = { ...report, existingHere: existingHere.status, elsewhere: elsewhere.length };
+      // Any earlier install on this machine makes this run an UPDATE of the workspace.
+      state.isUpdate =
+        existingHere.status === 'installed' || elsewhere.some((i) => i.status === 'installed');
       if (elsewhere.length && !removePrevious) {
         say('left the other install(s) in place; tick "remove previous install" to delete them');
       }
@@ -209,6 +212,14 @@ export async function runInstall(options = {}) {
     });
 
     await runStep('assistants', async () => {
+      // An update only refreshes the workspace. Claude Code / Codex / Gemini belong to the user:
+      // re-running their installers over a working copy deleted Claude twice on a teammate's PC
+      // (the native installer removes the npm copy first, then could not finish while sessions
+      // held the binary). Fresh installs still offer them; updates never touch them.
+      if (state.isUpdate) {
+        say('updating an existing install: Claude Code, Codex and Gemini are left as they are (update them yourself)');
+        return 'none';
+      }
       return resolveAndInstallAssistants({
         assistant,
         dryRun,

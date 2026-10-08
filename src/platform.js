@@ -13,6 +13,7 @@ export function platformInfo(platform = process.platform, env = process.env) {
     isLinux,
     home: env.HOME || env.USERPROFILE || os.homedir(),
     localAppData: env.LOCALAPPDATA || null,
+    appData: env.APPDATA || null,
     programFiles: env.ProgramFiles || env.PROGRAMFILES || null,
     temp: env.TEMP || env.TMPDIR || os.tmpdir(),
   };
