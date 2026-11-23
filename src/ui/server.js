@@ -17,6 +17,7 @@ import { resolveDocumentsDir } from '../paths.js';
 import { validateDestination, destinationCandidates } from '../destination.js';
 import { inspectInstall, findInstalls } from '../inspect.js';
 import { findShortcuts } from '../cleanup.js';
+import { detectAssistants, manualInstallCommand } from '../assistants.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(__dirname, 'public');
@@ -25,8 +26,17 @@ const LOGO_PNG = path.join(ASSETS, 'sleepmag-icon.png');
 const LOCKUP_PNG = path.join(ASSETS, 'lockup-black.png');
 const ICON_PNG = path.join(ASSETS, 'icon-black.png');
 
+/** After a finished install, how long the page gets to fetch the result before we exit. */
+const EXIT_AFTER_OK_MS = 15_000;
+/** After a failed install the page needs us for "Copy log"; we exit once no tab is left. */
+const EXIT_AFTER_LAST_TAB_MS = 120_000;
+
 /**
- * @param {{ env?: NodeJS.ProcessEnv, openBrowser?: boolean, port?: number }} [opts]
+ * @param {{ env?: NodeJS.ProcessEnv, openBrowser?: boolean, port?: number, exitWhenDone?: boolean }} [opts]
+ * @returns {Promise<{ url: string, port: number, logPath: string, server: http.Server,
+ *   close: () => Promise<void>, finished: Promise<'ok'|'failed'|'abandoned'> }>}
+ *   `finished` settles when the installer has nothing left to do, so the console that started it
+ *   can close by itself (it used to wait forever, until someone pressed Ctrl+C).
  */
 export async function startUiServer(opts = {}) {
   const env = opts.env || process.env;
@@ -37,6 +47,31 @@ export async function startUiServer(opts = {}) {
   const sseClients = new Set();
 
   let installRunning = false;
+  /** @type {(v: 'ok'|'failed'|'abandoned') => void} */
+  let settle = () => {};
+  const finished = new Promise((resolve) => {
+    settle = resolve;
+  });
+  let exitTimer = null;
+  const scheduleExit = (ms, why) => {
+    if (opts.exitWhenDone === false) return;
+    if (exitTimer) clearTimeout(exitTimer);
+    exitTimer = setTimeout(() => {
+      console.log('');
+      console.log(why === 'ok' ? 'Installer finished. This window closes now.' : 'Installer closed (no tab left open).');
+      server.closeAllConnections?.();
+      server.close(() => settle(why));
+      // SSE sockets can hold close() open; never let them keep the window alive.
+      setTimeout(() => settle(why), 2_000).unref();
+    }, ms);
+    exitTimer.unref?.();
+  };
+  /** No tab, nothing running: the person closed the page without installing. */
+  const maybeAbandoned = () => {
+    if (sseClients.size || installRunning) return;
+    const why = installState.status === 'ok' ? 'ok' : installState.status === 'failed' ? 'failed' : 'abandoned';
+    scheduleExit(why === 'ok' ? 3_000 : EXIT_AFTER_LAST_TAB_MS, why);
+  };
   /** @type {{ status: string, result?: object, error?: object }} */
   let installState = { status: 'idle' };
 
@@ -88,10 +123,15 @@ export async function startUiServer(opts = {}) {
     if (req.method === 'GET' && url.pathname === '/api/meta') {
       const documentsDir = safeDocuments(env);
       const suggested = validateDestination(null, { env, documentsDir, probe: false }).dest;
+      const found = detectAssistants();
       return json(res, {
         steps: STEPS,
         logPath: logger.logPath,
         status: installState.status,
+        // What is already on this computer, so the form can preselect Claude Code when it is missing.
+        assistants: Object.fromEntries(
+          Object.entries(found).map(([k, v]) => [k, { path: v, manual: manualInstallCommand(k) }]),
+        ),
         defaultDest: suggested,
         candidates: destinationCandidates({ env, documentsDir }),
         ...currentState(suggested),
@@ -139,7 +179,14 @@ export async function startUiServer(opts = {}) {
         );
       }
       sseClients.add(res);
-      req.on('close', () => sseClients.delete(res));
+      if (exitTimer && installState.status !== 'ok') {
+        clearTimeout(exitTimer);
+        exitTimer = null;
+      }
+      req.on('close', () => {
+        sseClients.delete(res);
+        maybeAbandoned();
+      });
       return;
     }
 
@@ -227,9 +274,11 @@ export async function startUiServer(opts = {}) {
                   ok: c.ok,
                   detail: c.detail,
                 })),
+                assistants: result.assistants || [],
               },
               ts: new Date().toISOString(),
             });
+            scheduleExit(EXIT_AFTER_OK_MS, 'ok');
           } catch (e) {
             const error = {
               message: e?.message || String(e),
@@ -244,9 +293,12 @@ export async function startUiServer(opts = {}) {
               error,
               ts: new Date().toISOString(),
             });
+            console.log('');
+            console.log('Install stopped. Copy the log from the browser tab; this window closes when the tab is closed.');
           } finally {
             setMessenger(null);
             installRunning = false;
+            maybeAbandoned();
           }
         })();
       });
@@ -308,12 +360,17 @@ export async function startUiServer(opts = {}) {
   if (opts.openBrowser !== false) {
     openBrowser(url);
   }
+  // Nobody ever opened the page (browser blocked, tab closed at once): do not sit here forever.
+  setTimeout(() => {
+    if (!sseClients.size && installState.status === 'idle') maybeAbandoned();
+  }, 60_000).unref();
 
   return {
     url,
     port: actualPort,
     logPath: logger.logPath,
     server,
+    finished,
     close: () =>
       new Promise((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));

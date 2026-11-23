@@ -21,7 +21,7 @@ export const STEPS = [
   { id: 'tools', label: 'Check tools' },
   { id: 'cleanup', label: 'Clear previous install' },
   { id: 'workspace', label: 'Download workspace' },
-  { id: 'assistants', label: 'Optional assistants' },
+  { id: 'assistants', label: 'AI assistant' },
   { id: 'setup', label: 'Your account setup' },
   { id: 'verify', label: 'Verify the install' },
   { id: 'launcher', label: 'Desktop launcher' },
@@ -212,18 +212,15 @@ export async function runInstall(options = {}) {
     });
 
     await runStep('assistants', async () => {
-      // An update only refreshes the workspace. Claude Code / Codex / Gemini belong to the user:
-      // re-running their installers over a working copy deleted Claude twice on a teammate's PC
-      // (the native installer removes the npm copy first, then could not finish while sessions
-      // held the binary). Fresh installs still offer them; updates never touch them.
-      if (state.isUpdate) {
-        say('updating an existing install: Claude Code, Codex and Gemini are left as they are (update them yourself)');
-        return 'none';
-      }
-      return resolveAndInstallAssistants({
-        assistant,
-        dryRun,
-      });
+      // Claude Code / Codex / Gemini belong to the user: one that is already there (on PATH or in
+      // its usual folder) is NEVER reinstalled or updated. Re-running the native installer over a
+      // working copy deleted Claude twice on a teammate's PC. An assistant that is missing is
+      // installed, on an update too: skipping every assistant on any update is how a teammate
+      // ended up with no Claude at all and no word about it.
+      if (state.isUpdate) say('updating an existing install: assistants already present are left as they are');
+      const r = await resolveAndInstallAssistants({ assistant, dryRun });
+      state.assistants = r.report;
+      return r.assistant;
     });
 
     await runStep('setup', async () => {
@@ -292,6 +289,9 @@ export async function runInstall(options = {}) {
       say(`The launcher did not open by itself (${openResult.evidence}).`);
       say(openResult.howTo || launcher?.hint || '');
     }
+    for (const a of state.assistants || []) {
+      if (a.status === 'failed') say(`${a.label} is NOT installed (${a.detail}). Run:  ${a.manual}`);
+    }
     say(
       'First time only: the assistant asks you to log in with your own Claude / OpenAI / Google account, and to trust the folder. Say yes.',
     );
@@ -315,6 +315,7 @@ export async function runInstall(options = {}) {
       open: openResult,
       cleanup: state.cleanup,
       verify: state.verify,
+      assistants: state.assistants || [],
       logPath: logger.logPath,
     };
   } finally {

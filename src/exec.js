@@ -171,6 +171,9 @@ export function sleep(ms) {
 export function run(cmd, args, opts = {}) {
   const result = spawnSync(cmd, args, {
     encoding: 'utf8',
+    // No child may wait on a keyboard nobody is looking at (the UI runs us in a hidden console):
+    // a prompt there sat until someone pressed Ctrl+C.
+    stdio: ['ignore', 'pipe', 'pipe'],
     timeout: opts.timeout || 300_000,
     env: opts.env || process.env,
     cwd: opts.cwd,
@@ -186,6 +189,52 @@ export function run(cmd, args, opts = {}) {
     combined: `${stdout}${stderr}`,
     error: result.error || null,
   };
+}
+
+/**
+ * Put a folder on the user's PATH for good (Windows; HKCU, no admin), so a NEW terminal finds
+ * what was installed there. The raw registry value is read and written so %USERPROFILE%-style
+ * entries stay unexpanded; the change is then broadcast so Explorer and new consoles see it.
+ * @param {string} dir
+ * @param {{ platform?: string, dryRun?: boolean }} [opts]
+ * @returns {{ added: boolean, error?: string }}
+ */
+export function ensureUserPath(dir, opts = {}) {
+  const platform = opts.platform || process.platform;
+  if (platform !== 'win32' || !dir || opts.dryRun) return { added: false };
+  const ps = [
+    `$dir = ${psQuote(dir)}`,
+    "function Norm($p) { ([Environment]::ExpandEnvironmentVariables($p)).TrimEnd([char]92).ToLowerInvariant() }",
+    "$raw = [string](Get-Item -Path 'HKCU:\\Environment').GetValue('Path', '', 'DoNotExpandEnvironmentNames')",
+    "$machine = [string][Environment]::GetEnvironmentVariable('Path', 'Machine')",
+    '$all = @(($raw + [char]59 + $machine) -split [char]59 | Where-Object { $_ } | ForEach-Object { Norm $_ })',
+    "if ($all -contains (Norm $dir)) { 'present'; exit 0 }",
+    '$next = if ($raw.Trim()) { $raw.TrimEnd([char]59) + [char]59 + $dir } else { $dir }',
+    "Set-ItemProperty -Path 'HKCU:\\Environment' -Name 'Path' -Value $next -Type ExpandString",
+    // Deleting a dummy user variable makes .NET broadcast WM_SETTINGCHANGE for us.
+    "[Environment]::SetEnvironmentVariable('SLEEPMAG_PATH_TOUCH', $null, 'User')",
+    "'added'",
+  ].join('\n');
+  const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], {
+    timeout: 30_000,
+  });
+  const out = String(r.stdout || '');
+  if (/\badded\b/.test(out)) {
+    // This process too, so the steps after this one find it.
+    const cur = process.env.PATH || process.env.Path || '';
+    if (!cur.toLowerCase().split(';').includes(String(dir).toLowerCase())) {
+      process.env.PATH = `${dir};${cur}`;
+      process.env.Path = process.env.PATH;
+    }
+    return { added: true };
+  }
+  if (/\bpresent\b/.test(out)) return { added: false };
+  const why = (r.stderr || r.combined || '').trim().split(/\r?\n/)[0];
+  return { added: false, error: why || `powershell exit ${r.code}` };
+}
+
+function psQuote(s) {
+  return `'${String(s).replace(/'/g, "''")}'`;
 }
 
 export function versionOf(exe, args = ['--version']) {

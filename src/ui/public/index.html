@@ -46,14 +46,17 @@
             />
           </label>
           <label>
-            Assistant (optional)
+            AI assistant
             <select id="assistant" name="assistant">
-              <option value="none" selected>Skip — already installed</option>
-              <option value="claude">Claude Code</option>
+              <option value="claude" selected>Claude Code (recommended)</option>
               <option value="codex">Codex</option>
               <option value="gemini">Gemini CLI</option>
-              <option value="all">Install all three</option>
+              <option value="all">All three</option>
+              <option value="none">None, I will install one myself</option>
             </select>
+            <span id="assistant-note" class="field-note">
+              Installed only if it is missing. One already on this computer is left as it is.
+            </span>
           </label>
           <label>
             Install folder
