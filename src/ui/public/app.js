@@ -50,6 +50,7 @@ async function init() {
     }
 
     if (destInput && meta.defaultDest) destInput.value = meta.defaultDest;
+    renderAssistants(meta.assistants || {});
     renderChoices(meta.candidates || []);
     renderState(meta);
 
@@ -68,6 +69,29 @@ async function init() {
     formError.hidden = false;
     formError.textContent =
       'Could not reach the installer. Close this tab and run the installer again.';
+  }
+}
+
+/** Say which assistants are already here; the select stays on Claude Code by default. */
+function renderAssistants(found) {
+  const select = document.getElementById('assistant');
+  const note = document.getElementById('assistant-note');
+  if (!select) return;
+  const names = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini CLI' };
+  const present = [];
+  for (const [key, label] of Object.entries(names)) {
+    const opt = select.querySelector(`option[value="${key}"]`);
+    if (found[key]?.path) {
+      present.push(label);
+      if (opt) opt.textContent = `${label} (already installed)`;
+    }
+  }
+  const claudeOpt = select.querySelector('option[value="claude"]');
+  if (claudeOpt && !found.claude?.path) claudeOpt.textContent = 'Claude Code (recommended, will be installed)';
+  if (note) {
+    note.textContent = present.length
+      ? `Already on this computer: ${present.join(', ')}. Those are left as they are; a missing one is installed.`
+      : 'Installed only if it is missing. One already on this computer is left as it is.';
   }
 }
 
@@ -302,6 +326,22 @@ function showResult(kind, ev) {
       );
     }
 
+    const assistants = r.assistants || [];
+    if (assistants.length) {
+      const items = assistants.map((a) => {
+        if (a.status === 'failed') {
+          return `<li class="bad"><span class="mark">✕</span><strong>${escapeHtml(a.label)} did not install.</strong>
+            <span>${escapeHtml(a.detail || '')}</span>
+            <span>Open PowerShell and run <code>${escapeHtml(a.manual || '')}</code></span></li>`;
+        }
+        const what = a.status === 'installed' ? 'installed' : 'already installed';
+        const path = a.path ? ` <code>${escapeHtml(a.path)}</code>` : '';
+        const pathNote = a.pathAdded ? ' <span class="muted">(added to your PATH)</span>' : '';
+        return `<li><span class="mark">✓</span><span>${escapeHtml(a.label)} ${what}</span>${path}${pathNote}</li>`;
+      });
+      parts.push(`<ul class="assistant-report">${items.join('')}</ul>`);
+    }
+
     if ((r.checks || []).length) {
       parts.push(
         `<details class="verify"><summary>What was verified</summary><ul class="checks">${r.checks
@@ -317,7 +357,7 @@ function showResult(kind, ev) {
       );
     }
 
-    parts.push('<p>You can close this tab.</p>');
+    parts.push('<p>You can close this tab. The installer window closes by itself.</p>');
     resultEl.innerHTML = parts.join('');
   } else {
     const err = ev.error || {};
@@ -390,7 +430,10 @@ copyBtn.addEventListener('click', async (e) => {
   e.preventDefault();
   e.stopPropagation();
   try {
-    const text = await fetch('/api/log').then((r) => r.text());
+    // The installer exits shortly after a finished install: fall back to the log on screen.
+    const text = await fetch('/api/log')
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error('no log'))))
+      .catch(() => logEl.textContent);
     await navigator.clipboard.writeText(text);
     copyBtn.textContent = 'Copied';
     setTimeout(() => {

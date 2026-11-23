@@ -538,3 +538,36 @@ button.ghost {
 .muted {
   color: var(--muted);
 }
+
+/* The HTML hidden attribute must win over any display rule above (.btn-busy is inline-flex):
+   without this the button showed its spinner and "Working…" before anything ran. */
+[hidden] {
+  display: none !important;
+}
+
+.assistant-report {
+  list-style: none;
+  margin: 0.5rem 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.assistant-report li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.assistant-report li.bad {
+  color: var(--danger);
+}
+
+.assistant-report code {
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  color: var(--muted);
+}

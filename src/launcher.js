@@ -262,6 +262,7 @@ $sc = $ws.CreateShortcut(${JSON.stringify(lnkPath)})
 $sc.TargetPath = ${JSON.stringify(target)}
 $sc.WorkingDirectory = ${JSON.stringify(opts.dest)}
 $sc.Description = ${JSON.stringify(LAUNCHER_NAME)}
+$sc.WindowStyle = 7
 ${iconLine}
 $sc.Save()
 `;

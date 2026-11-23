@@ -55,8 +55,11 @@ async function run() {
 
   if (wantUi()) {
     try {
-      await startUiServer({ openBrowser: true });
-      await new Promise(() => {});
+      const ui = await startUiServer({ openBrowser: true });
+      // Settles once the install is done (or the tab was closed without one): the console that
+      // started us then closes by itself instead of waiting for Ctrl+C.
+      const how = await ui.finished;
+      process.exitCode = how === 'failed' ? 1 : 0;
     } catch (err) {
       console.error('');
       console.error(`  ERROR  Could not open the installer UI: ${err?.message || err}`);
